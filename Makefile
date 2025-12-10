@@ -5,7 +5,7 @@ SRC = $(SRC_MAIN)
 OBJ = $(SRC:.cpp=.o)
 
 CXX = c++
-CXXFLAGS = -Wall -Wextra -Werror -std=c++98 -I headers 
+CXXFLAGS = -Wall -Wextra -Werror -std=c++98 -I include 
 
 GREEN = \033[1;32m
 YELLOW = \033[1;33m
