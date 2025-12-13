@@ -1,7 +1,11 @@
-NAME = webserver
+NAME = webserv
 
-SRC_MAIN = $(addprefix srcs/main/, main.cpp)
-SRC = $(SRC_MAIN)
+SRC_MAIN = main.cpp
+SRC_SERVER = server.cpp
+
+SRC = \
+		$(addprefix srcs/main/, $(SRC_MAIN)) \
+		$(addprefix srcs/server/, $(SRC_SERVER))
 OBJ = $(SRC:.cpp=.o)
 
 CXX = c++
