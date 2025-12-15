@@ -6,6 +6,10 @@
 #include "webserv.h"
 
 int main() {
-    Server  server;
+    try {
+        Server  server;
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl; 
+    }
     return 0;
 }

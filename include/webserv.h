@@ -5,6 +5,7 @@
 #include <string>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <exception>
 
 enum {
 	INFO = 100,
@@ -12,10 +13,16 @@ enum {
 	ERROR = 102
 };
 
+struct ServerConfig {
+	int	port;
+
+	ServerConfig() : port(8080) {}
+};
+
 class	Server {
 	private:
 		// config
-		int			port_;
+		ServerConfig	config_;
 
 		// variables
 		int			server_fd_;
@@ -23,8 +30,13 @@ class	Server {
 
 	public:
 		Server(); // Start server with default configurations
-		//Server(std::string& fileName); // Start server with configurations from file
+		Server(std::string& fileName); // Start server with configurations from file
 		~Server();
+
+		class	SocketError : public std::exception {
+			public:
+				const char*	what() const throw();
+		};
 
 };
 
