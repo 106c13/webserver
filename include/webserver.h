@@ -1,5 +1,5 @@
 #ifndef WEBSERVER_H
-#define WEBSERVER_h
+#define WEBSERVER_H
 
 #include <iostream>
 #include <string>
