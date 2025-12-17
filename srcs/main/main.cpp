@@ -1,13 +1,11 @@
 #include <iostream>
-#include <cstring>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include "webserv.h"
+#include "webserv.hpp"
 
 int main() {
     try {
         Server  server;
+
+        server.acceptConnection();
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl; 
     }

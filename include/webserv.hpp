@@ -1,5 +1,5 @@
-#ifndef WEBSERV_H
-#define WEBSERV_h
+#ifndef WEBSERV_HPP
+#define WEBSERV_HPP
 
 #include <iostream>
 #include <string>
@@ -15,7 +15,6 @@ enum {
 
 struct ServerConfig {
 	int	port;
-
 	ServerConfig() : port(8080) {}
 };
 
@@ -33,11 +32,15 @@ class	Server {
 		Server(std::string& fileName); // Start server with configurations from file
 		~Server();
 
+		void	acceptConnection();
+
 		class	SocketError : public std::exception {
 			public:
 				const char*	what() const throw();
 		};
 
 };
+
+void	log(int type, const std::string& msg);
 
 #endif
