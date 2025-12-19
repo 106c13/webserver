@@ -5,17 +5,35 @@
 #include <string>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <unistd.h>
 #include <exception>
 
 enum {
 	INFO = 100,
 	WARNING = 101,
-	ERROR = 102
+	ERROR = 102,
+
+	GET = 1000,
+	POST = 1001
 };
 
 struct ServerConfig {
 	int	port;
 	ServerConfig() : port(8080) {}
+};
+
+class	Request {
+	private:
+		// I don't know
+		int			request_fd_;
+		int			method_;
+		std::string	content_;
+	public:
+		Request(int	fd);
+		~Request();
+
+		const std::string&	get(); // I don't know what to write here
+		int					sendAll(const std::string& response);
 };
 
 class	Server {
