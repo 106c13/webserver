@@ -11,6 +11,15 @@ void	Server::acceptConnection() {
 		return;
 	}
 	Request request(request_fd);
-	std::cout << request.get() << std::endl;
+	// 1) Parse the resquest
+	// 2) Get the file name or director  request->http->path
+	//    If path ends with / then add default file index.html name to the path
+	// 3) Read the file request->http->path
+	std::string	path = config_.homeDir + "/index.html";
+
+	log(INFO, "<method> <path> <http_version> " + request.get());
+	if (!fileExists(path)) {
+		return pageNotFound(request);
+	}
 	request.sendAll("42 webserv");
 }

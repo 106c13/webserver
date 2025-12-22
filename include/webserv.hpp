@@ -18,8 +18,9 @@ enum {
 };
 
 struct ServerConfig {
-	int	port;
-	ServerConfig() : port(8080) {}
+	int			port;
+	std::string	homeDir;
+	ServerConfig() : port(8080), homeDir("/tmp") {}
 };
 
 class	Request {
@@ -51,14 +52,10 @@ class	Server {
 		~Server();
 
 		void	acceptConnection();
-
-		class	SocketError : public std::exception {
-			public:
-				const char*	what() const throw();
-		};
-
+		void	pageNotFound(Request& request) const;
 };
 
 void	log(int type, const std::string& msg);
+bool	fileExists(const std::string& path);
 
 #endif

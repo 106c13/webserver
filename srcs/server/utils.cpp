@@ -8,16 +8,20 @@
 void	log(int type, const std::string& msg) {
 	if (type == INFO) {
 		std::cout << COLOR_GREEN
-				  << "[INFO] <time> "
+				  << "[INFO] "
 				  << msg
 				  << COLOR_RESET
 				  << std::endl;
 	}
 	else if (type == ERROR) {
 		std::cerr << COLOR_RED
-				  << "[ERROR] <time> "
+				  << "[ERROR] "
 				  << msg
 				  << COLOR_RESET
 				  << std::endl;
 	}
+}
+
+bool fileExists(const std::string& path) {
+    return (access(path.c_str(), F_OK) == 0);
 }

@@ -5,7 +5,8 @@ OBJS_DIR = obj/
 INCLUDES = include
 
 SRC_MAIN   = main.cpp
-SRC_SERVER = server.cpp network.cpp utils.cpp
+SRC_SERVER = server.cpp network.cpp utils.cpp \
+			 defaults.cpp
 SRC_REQUEST = request.cpp
 
 SRC = \
@@ -54,11 +55,11 @@ $(NAME): $(OBJ)
 	@echo "$(BLUE)-------------------------------------------------------------------------------$(RESET)"
 
 clean:
-	@rm -f $(OBJ)
+	@rm -rf $(OBJS_DIR)
 	@echo "$(RED)🧹 Object files removed!$(RESET)"
 
 fclean: clean
-	@rm -f $(NAME)
+	@rm -rf $(NAME)
 	@echo "$(RED)🔥 Executable removed: $(NAME)$(RESET)"
 
 re: fclean all
