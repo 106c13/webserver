@@ -9,7 +9,7 @@ struct LocationConfig {
 	std::string							path;
 	std::string							root;
 	std::vector<std::string>			methods;
-	std::string							index;
+	std::vector<std::string>			index;
 	bool								autoindex;
 	int									redirectCode;
 	std::string							redirectUrl;
