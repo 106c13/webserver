@@ -1,7 +1,8 @@
 NAME = webserver
 
 SRC_MAIN = $(addprefix srcs/main/, main.cpp)
-SRC = $(SRC_MAIN)
+SRC_PARSER = $(addprefix srcs/parser/, ConfigParser.cpp HttpRequestParser.cpp)
+SRC = $(SRC_MAIN) $(SRC_PARSER)
 OBJ = $(SRC:.cpp=.o)
 
 CXX = c++
