@@ -9,12 +9,18 @@
 #include <exception>
 
 enum {
-	INFO = 100,
-	WARNING = 101,
-	ERROR = 102,
+	INFO = 10,
+	WARNING = 11,
+	ERROR = 12,
 
-	GET = 1000,
-	POST = 1001
+	GET = 100,
+	POST = 101,
+
+	PAGE_NOT_FOUND = 1000,
+	FORBIDDEN = 1001,
+	SERVER_ERROR = 1002,
+	BAD_REQUEST = 1003
+
 };
 
 struct ServerConfig {
@@ -52,10 +58,14 @@ class	Server {
 		~Server();
 
 		void	acceptConnection();
-		void	pageNotFound(Request& request) const;
+		void	handleRequest(Request&	request);
+
+		void	sendError(int code, Request& request) const;
 };
 
-void	log(int type, const std::string& msg);
-bool	fileExists(const std::string& path);
+void		log(int type, const std::string& msg);
+bool		fileExists(const std::string& path);
+bool		canReadFile(const std::string& path);
+std::string	readFile(const std::string& filename);
 
 #endif

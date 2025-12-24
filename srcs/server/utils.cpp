@@ -1,5 +1,6 @@
-#include "webserv.hpp"
+#include <fcntl.h>
 #include <iostream>
+#include "webserv.hpp"
 
 #define COLOR_GREEN "\033[1;32m"
 #define COLOR_RED   "\033[1;31m"
@@ -24,4 +25,26 @@ void	log(int type, const std::string& msg) {
 
 bool fileExists(const std::string& path) {
     return (access(path.c_str(), F_OK) == 0);
+}
+
+bool canReadFile(const std::string& path) {
+	return (access(path.c_str(), R_OK) == 0);
+}
+
+std::string readFile(const std::string& filename) {
+	int         fd;
+	char        buffer[1024];
+	ssize_t     bytes;
+	std::string content;
+
+	fd = open(filename.c_str(), O_RDONLY);
+	if (fd < 0)
+		return ""; // caller decides what to do (403 / 404)
+
+	while ((bytes = read(fd, buffer, sizeof(buffer))) > 0) {
+		content.append(buffer, bytes);
+	}
+
+	close(fd);
+	return content;
 }

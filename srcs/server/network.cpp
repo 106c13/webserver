@@ -1,6 +1,26 @@
 #include "webserv.hpp"
 
+void	Server::handleRequest(Request&	request) {
+	// 1) Parse the resquest
+	// 2) Get the file name or director  request->http->path
+	//    If path ends with / then add default file index.html name to the path
+	// 3) Read the file request->http->path
+	std::string	path = config_.homeDir + "/index.html";
+	std::string	page;
+
+	log(INFO, "<method> <path> <http_version> " + request.get());
+	if (!fileExists(path)) {
+		return sendError(PAGE_NOT_FOUND, request);
+	}
+	if (!canReadFile(path)) {
+		return sendError(FORBIDDEN, request);
+	}
+	page = readFile(path);
+	request.sendAll(page);
+}
+
 void	Server::acceptConnection() {
+	pid_t		pid;
 	int			request_fd;
 	sockaddr_in	request_addr;
 	socklen_t	request_len = sizeof(request_addr);
@@ -11,15 +31,12 @@ void	Server::acceptConnection() {
 		return;
 	}
 	Request request(request_fd);
-	// 1) Parse the resquest
-	// 2) Get the file name or director  request->http->path
-	//    If path ends with / then add default file index.html name to the path
-	// 3) Read the file request->http->path
-	std::string	path = config_.homeDir + "/index.html";
-
-	log(INFO, "<method> <path> <http_version> " + request.get());
-	if (!fileExists(path)) {
-		return pageNotFound(request);
+	pid = fork();
+	if (pid == 0) {
+		handleRequest(request);
+		_exit(0);
+	} else if (pid < 0) {
+		log(ERROR, "Failed to create new process");
+		return sendError(SERVER_ERROR, request);
 	}
-	request.sendAll("42 webserv");
 }

@@ -7,7 +7,7 @@ INCLUDES = include
 SRC_MAIN   = main.cpp
 SRC_SERVER = server.cpp network.cpp utils.cpp \
 			 defaults.cpp
-SRC_REQUEST = request.cpp
+SRC_REQUEST = request.cpp network.cpp
 
 SRC = \
 	$(addprefix $(SRCS_DIR)main/, $(SRC_MAIN)) \
