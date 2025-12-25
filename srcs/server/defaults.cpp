@@ -1,5 +1,5 @@
 #include <sstream>
-#include "webserv.hpp"
+#include "webserv.h"
 
 void	Server::sendError(int code, Request& request) const {
 	std::string			page;

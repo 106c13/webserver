@@ -14,7 +14,6 @@ SRC = \
 	$(addprefix $(SRCS_DIR)server/, $(SRC_SERVER)) \
 	$(addprefix $(SRCS_DIR)request/, $(SRC_REQUEST))
 
-# Map srcs/.../*.cpp → obj/.../*.o
 OBJ = $(patsubst $(SRCS_DIR)%.cpp, $(OBJS_DIR)%.o, $(SRC))
 
 CXX = c++

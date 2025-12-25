@@ -1,5 +1,5 @@
 #include <iostream>
-#include "webserv.hpp"
+#include "webserv.h"
 #include <sys/wait.h>
 
 int main() {

@@ -1,4 +1,4 @@
-#include "webserv.hpp"
+#include "webserv.h"
 
 void	Server::handleRequest(Request&	request) {
 	// 1) Parse the resquest

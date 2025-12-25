@@ -1,5 +1,5 @@
 #include <sstream>
-#include "webserv.hpp"
+#include "webserv.h"
 
 int	Request::sendAll(const std::string&	response) {
 	size_t		total = 0;

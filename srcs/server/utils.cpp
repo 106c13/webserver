@@ -1,6 +1,6 @@
 #include <fcntl.h>
 #include <iostream>
-#include "webserv.hpp"
+#include "webserv.h"
 
 #define COLOR_GREEN "\033[1;32m"
 #define COLOR_RED   "\033[1;31m"
