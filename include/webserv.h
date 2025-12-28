@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <exception>
+#include "ConfigParser.h"
 
 enum Log {
 	INFO = 10,
@@ -25,12 +26,6 @@ enum Page {
 	SERVER_ERROR = 1002,
 	BAD_REQUEST = 1003
 
-};
-
-struct ServerConfig {
-	int			port;
-	std::string	homeDir;
-	ServerConfig() : port(8080), homeDir("/tmp") {}
 };
 
 class	HttpRequest {

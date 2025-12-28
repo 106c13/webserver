@@ -5,7 +5,7 @@ void	Server::handleRequest(HttpRequest&	request) {
 	// 2) Get the file name or director  request->http->path
 	//    If path ends with / then add default file index.html name to the path
 	// 3) Read the file request->http->path
-	std::string	path = config_.homeDir + "/index.html";
+	std::string	path = config_.root + "/index.html";
 	std::string	page;
 
 	log(INFO, "<method> <path> <http_version> " + request.get());
