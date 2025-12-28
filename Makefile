@@ -26,10 +26,14 @@ YELLOW = \033[1;33m
 BLUE = \033[1;34m
 RED = \033[1;31m
 CYAN = \033[1;36m
-PURPLE = \033[1;35m
 RESET = \033[0m
 
 all: $(NAME)
+
+$(NAME): $(OBJ)
+	@echo "$(YELLOW)🔧 Linking $(NAME)...$(RESET)"
+	@$(CXX) $(CXXFLAGS) $(OBJ) -o $(NAME)
+	@echo "$(GREEN)✅ Build complete: ./$(NAME)$(RESET)"
 
 $(OBJS_DIR)%.o: $(SRCS_DIR)%.cpp
 	@mkdir -p $(dir $@)
@@ -55,7 +59,7 @@ clean:
 	@echo "$(RED)🧹 Object files removed!$(RESET)"
 
 fclean: clean
-	@rm -f $(NAME)
+	@rm -rf $(NAME)
 	@echo "$(RED)🔥 Executable removed: $(NAME)$(RESET)"
 
 re: fclean all
