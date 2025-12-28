@@ -41,9 +41,8 @@ Server::Server() {
 	initSocket();
 }
 
-Server::Server(const std::string& filename) {
-	(void)filename;
-	// parser(config_, filename);
+Server::Server(const ServerConfig& config) {
+	config_ = config;
 	initSocket();
 }
 

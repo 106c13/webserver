@@ -9,6 +9,10 @@
 #include <exception>
 #include "ConfigParser.h"
 
+#define COLOR_GREEN "\033[1;32m"
+#define COLOR_RED   "\033[1;31m"
+#define COLOR_RESET "\033[0m"
+
 enum Log {
 	INFO = 10,
 	WARNING = 11,
@@ -55,7 +59,7 @@ class	Server {
 
 	public:
 		Server(); // Start server with default configurations
-		Server(const std::string& fileName); // Start server with configurations from file
+		Server(const ServerConfig& config); // Start server with configurations from file
 		~Server();
 
 		void	acceptConnection();
