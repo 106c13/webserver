@@ -5,6 +5,19 @@
 #include <map>
 #include <string>
 
+enum TokenType {
+	TOK_WORD,
+	TOK_LBRACE,		// {
+	TOK_RBRACE,		// }
+	TOK_SEMICOLON	// ;
+};
+
+struct Token {
+	TokenType	type;
+	std::string	value;
+	Token(TokenType t, const std::string& value) : type(t), value(value) {}
+};
+
 struct LocationConfig {
 	std::string							path;
 	std::string							root;
@@ -39,8 +52,14 @@ struct Config {
 
 class ConfigParser {
 private:
-	Config _conf;
-	// be done soon
+	Config				_conf;
+
+	std::vector<Token>	_tokens;
+	size_t				_tokens_pos;
+
+	Token&	current();
+	void	tokenize(const std::string& filename);
+	void	parseServer();
 public:
 	ConfigParser();
 	ConfigParser(const std::string& filename);
