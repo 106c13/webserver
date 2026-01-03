@@ -55,7 +55,7 @@ void	Server::handleRequest(HttpRequest& request) {
 	std::string	response;
 	int			fd;
 
-	//log(INFO, "<method> <path> <http_version> " + request.get());
+	log(INFO, "<method> <path> <http_version> " + request.get());
 	if (!fileExists(path)) {
 		return sendError(NOT_FOUND, request);
 	}
@@ -75,6 +75,7 @@ void	Server::handleRequest(HttpRequest& request) {
 }
 
 void	Server::acceptConnection() {
+	pid_t		pid;
 	int			request_fd;
 	sockaddr_in	request_addr;
 	socklen_t	request_len = sizeof(request_addr);
@@ -85,5 +86,12 @@ void	Server::acceptConnection() {
 		return;
 	}
 	HttpRequest request(request_fd);
-	handleRequest(request);
+	pid = fork();
+	if (pid == 0) {
+		handleRequest(request);
+		_exit(0);
+	} else if (pid < 0) {
+		log(ERROR, "Failed to create new process");
+		return sendError(SERVER_ERROR, request);
+	}
 }
