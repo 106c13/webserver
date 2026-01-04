@@ -39,7 +39,7 @@ struct ServerConfig {
 	int							port;
 	std::vector<std::string>	serverNames;
 	std::string					root;
-	size_t						clientMaxBodySize;
+	long long					clientMaxBodySize;
 	std::map<int, std::string>	errorPages;
 	std::vector<LocationConfig>	locations;
 
@@ -57,9 +57,13 @@ private:
 	std::vector<Token>	_tokens;
 	size_t				_tokens_pos;
 
-	Token&	current();
-	void	tokenize(const std::string& filename);
-	void	parseServer();
+	Token&		current();
+	Token&		next();
+	void		expect(TokenType type, const std::string& err);
+	void		tokenize(const std::string& filename);
+	void		parseServer();
+	void		parseLocation(ServerConfig& server);
+	long long	parseSize(const std::string& size);
 public:
 	ConfigParser();
 	ConfigParser(const std::string& filename);
@@ -69,6 +73,7 @@ public:
 
 	void parse(const std::string& filename);
 	const Config& getConfig() const;                   // <- main func to get config
+	void print() const;
 };
 
 #endif
