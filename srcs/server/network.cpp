@@ -37,6 +37,7 @@ int Server::runCGI(const char* path, const HttpRequest& request)
 		env = createEviroment(request);
 		char* argv[] = {
 			strdup(path),
+			strdup("/tmp/index.html"),
             NULL
         };
 		execve(path, argv, env);
@@ -55,7 +56,7 @@ void	Server::handleRequest(HttpRequest& request) {
 	std::string	response;
 	int			fd;
 
-	//log(INFO, "<method> <path> <http_version> " + request.get());
+	log(INFO, "<method> <path> <http_version> " + request.get());
 	if (!fileExists(path)) {
 		return sendError(NOT_FOUND, request);
 	}
@@ -63,15 +64,15 @@ void	Server::handleRequest(HttpRequest& request) {
 		return sendError(FORBIDDEN, request);
 	}
 	// 1) When no CGI, just simple read file and send it
-	fd = open(path.c_str(), 'r');
-	request.sendAll(path, fd);
-	close(fd);
+	// fd = open(path.c_str(), 'r');
+	// request.sendAll(path, fd);
+	// close(fd);
 	// response = readFile(path);
 	// 2) If CGI is on, then prepare the enviroment
-	// fd = runCGI("/usr/bin/php-cgi", request);
-	// if (fd < 0)
-	// 	return sendError(SERVER_ERROR, request);
-	// request.sendAll(fd);
+	 fd = runCGI("./php-cgi", request);
+	 if (fd < 0)
+	 	return sendError(SERVER_ERROR, request);
+	 request.sendAll(fd);
 }
 
 void	Server::acceptConnection() {

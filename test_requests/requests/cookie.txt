@@ -1,0 +1,3 @@
+GET /profile HTTP/1.1
+Host: example.com
+Cookie: session_id=abc123; theme=dark

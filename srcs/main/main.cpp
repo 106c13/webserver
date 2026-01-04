@@ -5,8 +5,8 @@
 int main() {
     try {
         Server  server;
-        
-        while (1) {
+        int i = 0;
+        while (i++ < 10) {
             server.acceptConnection();
             while (waitpid(-1, NULL, WNOHANG) > 0) {}
         }
