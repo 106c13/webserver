@@ -5,6 +5,19 @@
 #include <map>
 #include <string>
 
+enum TokenType {
+	TOK_WORD,
+	TOK_LBRACE,		// {
+	TOK_RBRACE,		// }
+	TOK_SEMICOLON	// ;
+};
+
+struct Token {
+	TokenType	type;
+	std::string	value;
+	Token(TokenType t, const std::string& value) : type(t), value(value) {}
+};
+
 struct LocationConfig {
 	std::string							path;
 	std::string							root;
@@ -26,7 +39,7 @@ struct ServerConfig {
 	int							port;
 	std::vector<std::string>	serverNames;
 	std::string					root;
-	size_t						clientMaxBodySize;
+	long long					clientMaxBodySize;
 	std::map<int, std::string>	errorPages;
 	std::vector<LocationConfig>	locations;
 
@@ -39,8 +52,18 @@ struct Config {
 
 class ConfigParser {
 private:
-	Config _conf;
-	// be done soon
+	Config				_conf;
+
+	std::vector<Token>	_tokens;
+	size_t				_tokens_pos;
+
+	Token&		current();
+	Token&		next();
+	void		expect(TokenType type, const std::string& err);
+	void		tokenize(const std::string& filename);
+	void		parseServer();
+	void		parseLocation(ServerConfig& server);
+	long long	parseSize(const std::string& size);
 public:
 	ConfigParser();
 	ConfigParser(const std::string& filename);
@@ -50,6 +73,7 @@ public:
 
 	void parse(const std::string& filename);
 	const Config& getConfig() const;                   // <- main func to get config
+	void print() const;
 };
 
 #endif
