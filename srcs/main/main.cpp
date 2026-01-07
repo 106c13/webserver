@@ -4,22 +4,49 @@
 #include "ConfigParser.h"
 
 int main(int argc, char **argv) {
-	if (argc != 2) {
+	if (argc > 2) {
 		std::cerr << "Usage: " << argv[0] << " <config_file>" << std::endl;
 		return 1;
-	}
-    try {
+    } else if (argc == 2) {
 		ConfigParser parser;
-        Server  server;
-        
 		parser.parse(argv[1]);
 		parser.print();
-        while (1) {
-            server.acceptConnection();
-            while (waitpid(-1, NULL, WNOHANG) > 0) {}
+        const struct Config config = parser.getConfig();
+
+        try {
+            Server  server(config.servers[0]);
+
+            int i = 0;
+            while (i++ < 10) {
+                try {
+                    server.acceptConnection();
+                    while (waitpid(-1, NULL, WNOHANG) > 0) {}
+                } catch (const std::exception& e) {
+                    log(ERROR, e.what()); 
+                }
+            }
+        } catch (const std::exception& e) {
+            log(ERROR, e.what());
+            return 1;
         }
-    } catch (const std::exception& e) {
-        log(ERROR, e.what()); 
+    } else {
+        try {
+            Server  server;
+
+            int i = 0;
+            while (i++ < 10) {
+                try {
+                    server.acceptConnection();
+                    while (waitpid(-1, NULL, WNOHANG) > 0) {}
+                } catch (const std::exception& e) {
+                    log(ERROR, e.what()); 
+                }
+            }
+        } catch (const std::exception& e) {
+            log(ERROR, e.what());
+            return 1;
+        }
     }
+
     return 0;
 }

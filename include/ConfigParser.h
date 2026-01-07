@@ -4,6 +4,7 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <stdlib.h>
 
 enum TokenType {
 	TOK_WORD,
