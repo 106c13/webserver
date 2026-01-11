@@ -1,7 +1,7 @@
 #include <sstream>
 #include "webserv.h"
 
-void	Server::sendError(int code, HttpRequest& request) const {
+void Server::sendError(int code, HttpRequest& request) const {
 	std::string			page;
 
 	if (code == NOT_FOUND) {

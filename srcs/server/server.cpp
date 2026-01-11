@@ -12,6 +12,7 @@
 void Server::initSocket() {
 	std::ostringstream oss;
 
+	log(INFO, "Starting server");
 	server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
 	if (server_fd_ < 0)
 		throw std::runtime_error("socket() failed");
@@ -35,10 +36,9 @@ void Server::initSocket() {
 		oss << "listen() failed on port " << config_.port;
 		throw std::runtime_error(oss.str());
 	}
-}
-
-Server::Server() {
-	initSocket();
+	oss << "Server started on port ";
+	oss << config_.port;
+	log(INFO, oss.str()); 
 }
 
 Server::Server(const ServerConfig& config) {

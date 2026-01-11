@@ -37,13 +37,18 @@ class	HttpRequest {
 		// I don't know
 		int			request_fd_;
 		int			method_;
+		std::string	file_;
 		std::string	content_;
 	public:
 		HttpRequest(int	fd);
 		~HttpRequest();
 
 		const std::string&	get(); // I don't know what to write here
+		const std::string&	getFile() const;
+		void				setFile(const std::string& file);
 		int					sendAll(const std::string& response);
+		int					sendAll(const std::string& path, int fd);
+		int					sendAll(const int fd);
 };
 
 class	Server {
@@ -58,19 +63,19 @@ class	Server {
 		void	initSocket();
 
 	public:
-		Server(); // Start server with default configurations
 		Server(const ServerConfig& config); // Start server with configurations from file
 		~Server();
 
 		void	acceptConnection();
 		void	handleRequest(HttpRequest&	request);
-
 		void	sendError(int code, HttpRequest& request) const;
+		int		runCGI(const char* path, const HttpRequest& request);
 };
 
 void		log(int type, const std::string& msg);
 bool		fileExists(const std::string& path);
 bool		canReadFile(const std::string& path);
+ssize_t		getFileSize(const std::string& path);
 std::string	readFile(const std::string& filename);
 
 #endif

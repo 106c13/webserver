@@ -1,8 +1,9 @@
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <iostream>
 #include "webserv.h"
 
-void	log(int type, const std::string& msg) {
+void log(int type, const std::string& msg) {
 	if (type == INFO) {
 		std::cout << COLOR_GREEN
 				  << "[INFO] "
@@ -25,6 +26,15 @@ bool fileExists(const std::string& path) {
 
 bool canReadFile(const std::string& path) {
 	return (access(path.c_str(), R_OK) == 0);
+}
+
+ssize_t getFileSize(const std::string& path)
+{
+	struct stat st;
+
+	if (stat(path.c_str(), &st) < 0)
+		return -1;
+	return st.st_size;
 }
 
 std::string readFile(const std::string& filename) {
