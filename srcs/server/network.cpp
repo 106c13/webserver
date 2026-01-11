@@ -2,7 +2,7 @@
 #include <fcntl.h>
 #include "webserv.h"
 
-static char**	createEviroment(const HttpRequest& request) {
+static char** createEviroment(const HttpRequest& request) {
 	char **env = new char*[5]; 
 	// parsing the request
 	(void)request;
@@ -47,7 +47,7 @@ int Server::runCGI(const char* path, const HttpRequest& request)
     return pipefd[0];
 }
 
-void	Server::handleRequest(HttpRequest& request) {
+void Server::handleRequest(HttpRequest& request) {
 	// 1) Parse the resquest
 	// 2) Get the file name or directory from request->http->path
 	//    If path ends with / then add default file name like index.html to the path
@@ -76,7 +76,7 @@ void	Server::handleRequest(HttpRequest& request) {
 	// request.sendAll(fd);
 }
 
-void	Server::acceptConnection() {
+void Server::acceptConnection() {
 	int			request_fd;
 	sockaddr_in	request_addr;
 	socklen_t	request_len = sizeof(request_addr);

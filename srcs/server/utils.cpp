@@ -3,7 +3,7 @@
 #include <iostream>
 #include "webserv.h"
 
-void	log(int type, const std::string& msg) {
+void log(int type, const std::string& msg) {
 	if (type == INFO) {
 		std::cout << COLOR_GREEN
 				  << "[INFO] "
@@ -20,11 +20,11 @@ void	log(int type, const std::string& msg) {
 	}
 }
 
-bool	fileExists(const std::string& path) {
+bool fileExists(const std::string& path) {
     return (access(path.c_str(), F_OK) == 0);
 }
 
-bool	canReadFile(const std::string& path) {
+bool canReadFile(const std::string& path) {
 	return (access(path.c_str(), R_OK) == 0);
 }
 
@@ -37,7 +37,7 @@ ssize_t getFileSize(const std::string& path)
 	return st.st_size;
 }
 
-std::string	readFile(const std::string& filename) {
+std::string readFile(const std::string& filename) {
 	int         fd;
 	char        buffer[1024];
 	ssize_t     bytes;

@@ -41,10 +41,6 @@ void Server::initSocket() {
 	log(INFO, oss.str()); 
 }
 
-Server::Server() {
-	initSocket();
-}
-
 Server::Server(const ServerConfig& config) {
 	config_ = config;
 	initSocket();

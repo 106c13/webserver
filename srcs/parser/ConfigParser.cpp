@@ -16,7 +16,6 @@ LocationConfig::LocationConfig() :
 ServerConfig::ServerConfig() :
 	host("0.0.0.0"),
 	port(8080),
-	root("/tmp/"),
 	clientMaxBodySize(1024 * 1024) {
 }
 

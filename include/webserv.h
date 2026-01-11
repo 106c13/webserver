@@ -63,7 +63,6 @@ class	Server {
 		void	initSocket();
 
 	public:
-		Server(); // Start server with default configurations
 		Server(const ServerConfig& config); // Start server with configurations from file
 		~Server();
 
