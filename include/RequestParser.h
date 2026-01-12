@@ -25,15 +25,28 @@ struct SetCookie {
 	SetCookie();
 };
 
+struct MultipartPart {
+	std::string							name;
+	std::string							filename;
+	std::string							contentType;
+	std::string							data;
+	std::map<std::string, std::string>	headers;
+	MultipartPart();
+};
+
 struct Request {
 	std::string							method;
 	std::string							uri;
+	std::string							path;
+	std::string							queryString;
 	std::string							version;
 	std::map<std::string, std::string>	headers;
-	std::vector<std::string>			multiHeaders;
+	std::map<std::string, std::string>	queryParams;
 	std::string							body;
 	std::vector<Cookie>					cookies;
 	std::vector<SetCookie>				setCookies;
+	std::vector<MultipartPart>			multipartParts;
+	std::string							boundary;
 	Request();
 };
 
@@ -45,17 +58,14 @@ public:
 	RequestParser& operator=(const RequestParser& other);
 	~RequestParser();
 
-	/*
-	const Request&	getRequest() const;
-	*/
 	void			parse(const std::string& raw);
 	void			print() const;
+	const Request&	getRequest() const;
+
 private:
-	/*
 	std::string	_raw;
 	size_t		_pos;
 	Request		_request;
-	*/
 
 	char			current();
 	char			next();
@@ -70,6 +80,9 @@ private:
 	void			parseBody();
 	void			parseCookies(const std::string& cookieHeader);
 	void			parseSetCookie(const std::string& setCookieHeader);
+	void			parseQueryString(const std::string& queryString);
+	void			parseMultipart();
+	std::string		extractBoundary(const std::string& contentType);
 };
 
 #endif
