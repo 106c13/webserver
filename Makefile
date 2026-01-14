@@ -18,7 +18,7 @@ SRC_MAIN   = main.cpp
 SRC_SERVER = server.cpp network.cpp utils.cpp \
              defaults.cpp
 SRC_REQUEST = request.cpp network.cpp
-SRC_PARSER = ConfigParser.cpp HttpRequestParser.cpp
+SRC_PARSER = ConfigParser.cpp RequestParser.cpp
 
 SRC = \
     $(addprefix $(SRCS_DIR)main/, $(SRC_MAIN)) \
@@ -72,6 +72,11 @@ $(NAME): $(OBJ)
 	@echo "$(RED)                       🔥 MADE BY: Arseniy & Hakob 🔥         $(RESET)"
 	@echo "$(BLUE)-------------------------------------------------------------------------------$(RESET)"
 
+test:
+	@$(CXX) $(CXXFLAGS) tests/test_config_parser.cpp $(SRCS_DIR)parser/ConfigParser.cpp -o test_config_parser
+	@$(CXX) $(CXXFLAGS) tests/test_request_parser.cpp $(SRCS_DIR)parser/RequestParser.cpp -o test_request_parser
+	@./test_config_parser ; c=$$? ; echo "" ; ./test_request_parser ; r=$$? ; rm -f test_config_parser test_request_parser ; exit $$((c + r))
+
 clean:
 	@rm -rf $(OBJS_DIR)
 	@echo "$(RED)🧹 Object files removed!$(RESET)"
@@ -82,4 +87,4 @@ fclean: clean
 
 re: fclean all
 
-.PHONY: all clean fclean re
+.PHONY: all clean fclean re test
