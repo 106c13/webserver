@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <exception>
 #include "ConfigParser.h"
+#include "RequestParser.h"
 
 #define COLOR_GREEN "\033[1;32m"
 #define COLOR_RED   "\033[1;31m"
@@ -29,23 +30,25 @@ enum Page {
 	FORBIDDEN = 1001,
 	SERVER_ERROR = 1002,
 	BAD_REQUEST = 1003
-
 };
 
 class	HttpRequest {
 	private:
 		// I don't know
 		int			request_fd_;
-		int			method_;
-		std::string	file_;
-		std::string	content_;
+		std::string content_;
+		Request		body_;
 	public:
 		HttpRequest(int	fd);
 		~HttpRequest();
 
-		const std::string&	get(); // I don't know what to write here
-		const std::string&	getFile() const;
+		void				setRequest(const Request& request);
 		void				setFile(const std::string& file);
+
+		const std::string&	get(); // I don't know what to write here
+		const std::string&	getPath() const;
+		const std::string&	getMethod() const;
+
 		int					sendAll(const std::string& response);
 		int					sendAll(const std::string& path, int fd);
 		int					sendAll(const int fd);
@@ -55,6 +58,7 @@ class	Server {
 	private:
 		// config
 		ServerConfig	config_;
+		RequestParser	parser_;
 
 		// variables
 		int			server_fd_;
@@ -73,6 +77,8 @@ class	Server {
 };
 
 void		log(int type, const std::string& msg);
+void		log(const HttpRequest& request);
+int			get_path_type(const char *path);
 bool		fileExists(const std::string& path);
 bool		canReadFile(const std::string& path);
 ssize_t		getFileSize(const std::string& path);

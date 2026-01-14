@@ -1,5 +1,7 @@
 #include <string.h>
 #include <fcntl.h>
+#include <cerrno>
+#include <sys/stat.h>
 #include "webserv.h"
 
 static char** createEviroment(const HttpRequest& request) {
@@ -37,7 +39,7 @@ int Server::runCGI(const char* path, const HttpRequest& request)
 		env = createEviroment(request);
 		char* argv[] = {
 			strdup(path),
-			strdup(request.getFile().c_str()),
+			strdup(request.getPath().c_str()),
             NULL
         };
 		execve(path, argv, env);
@@ -52,22 +54,50 @@ void Server::handleRequest(HttpRequest& request) {
 	// 2) Get the file name or directory from request->http->path
 	//    If path ends with / then add default file name like index.html to the path
 	// 3) Read the file request->http->path
-	request.setFile(config_.root + "/index.html");
-	std::string path = request.getFile();
-	std::string	response;
-	int			fd;
+	std::string path;
+	struct stat st;
+	int fd;
+	
+	parser_.parse(request.get());
+	request.setRequest(parser_.getRequest());
 
-	log(INFO, "<method> <path> <http_version> " + request.get());
-	if (!fileExists(path)) {
-		return sendError(NOT_FOUND, request);
-	}
-	if (!canReadFile(path)) {
-		return sendError(FORBIDDEN, request);
-	}
+	log(request);
+	path = config_.root + request.getPath();
+
+	if (stat(path.c_str(), &st) != 0) {
+		if (errno == ENOENT)
+			return sendError(NOT_FOUND, request);
+        return sendError(FORBIDDEN, request);
+    }
+
+    if (S_ISDIR(st.st_mode)) {
+        if (path[path.size() - 1] != '/')
+            return sendError(FORBIDDEN, request);
+        path += "index.html";
+        if (stat(path.c_str(), &st) != 0) {
+            if (errno == ENOENT)
+                return sendError(FORBIDDEN, request);
+            return sendError(FORBIDDEN, request);
+        }
+    }
+
+    if (!S_ISREG(st.st_mode))
+        return sendError(FORBIDDEN, request);
+
+    fd = open(path.c_str(), O_RDONLY);
+    if (fd < 0) {
+        if (errno == EACCES)
+            return sendError(FORBIDDEN, request);
+        return sendError(NOT_FOUND, request);
+    }
+
 	// 1) When no CGI, just simple read file and send it
 	fd = open(path.c_str(), O_RDONLY);
 	request.sendAll(path, fd);
 	close(fd);
+
+
+
 	// response = readFile(path);
 	// 2) If CGI is on, then prepare the enviroment
 	// fd = runCGI("./php-cgi", request);
