@@ -48,6 +48,7 @@ class	HttpRequest {
 		const std::string&	get(); // I don't know what to write here
 		const std::string&	getPath() const;
 		const std::string&	getMethod() const;
+		const std::string&	getURI() const;
 
 		int					sendAll(const std::string& response);
 		int					sendAll(const std::string& path, int fd);
@@ -64,16 +65,18 @@ class	Server {
 		int			server_fd_;
 		sockaddr_in	addr_;
 
-		void	initSocket();
+		void			initSocket();
+		int				runCGI(const char* path, const HttpRequest& request);
+		void			handleRequest(HttpRequest&	request);
+		int				resolve_path(std::string& path, LocationConfig& location);
+		LocationConfig&	resolve_location(const std::string& uri, std::string& fs_path);
 
 	public:
 		Server(const ServerConfig& config); // Start server with configurations from file
 		~Server();
 
 		void	acceptConnection();
-		void	handleRequest(HttpRequest&	request);
 		void	sendError(int code, HttpRequest& request) const;
-		int		runCGI(const char* path, const HttpRequest& request);
 };
 
 void		log(int type, const std::string& msg);

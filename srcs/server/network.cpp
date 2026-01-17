@@ -1,53 +1,7 @@
 #include <string.h>
 #include <fcntl.h>
-#include <cerrno>
-#include <sys/stat.h>
 #include "webserv.h"
 
-static char** createEviroment(const HttpRequest& request) {
-	char **env = new char*[5]; 
-	// parsing the request
-	(void)request;
-	// ==================== TEST =====================
-	env[0] = strdup("REQUEST_METHOD=GET");
-    env[1] = strdup("SCRIPT_FILENAME=/tmp/index.php");
-	env[2] = strdup("REDIRECT_STATUS=200");
-	env[3] = strdup("QUERY_STRING=name=Karlito&age=42");
-    env[4] = NULL;
-	// ===============================================
-	return env;
-}
-
-int Server::runCGI(const char* path, const HttpRequest& request)
-{
-	int		pipefd[2];
-	pid_t	pid;
-	char**	env;
-
-	if (pipe(pipefd) < 0) {
-		log(ERROR, "PIPE ERROR");
-		return -1;
-	}
-	pid = fork();
-	if (pid < 0) {
-		log(ERROR, "FORK ERROR");
-		return -1;
-	} else if (pid == 0) {
-		close(pipefd[0]);
-		dup2(pipefd[1], STDOUT_FILENO);
-		close(pipefd[1]);
-		env = createEviroment(request);
-		char* argv[] = {
-			strdup(path),
-			strdup(request.getPath().c_str()),
-            NULL
-        };
-		execve(path, argv, env);
-		_exit(1);
-	}
-	close(pipefd[1]);
-    return pipefd[0];
-}
 
 void Server::handleRequest(HttpRequest& request) {
 	// 1) Parse the resquest
@@ -55,48 +9,32 @@ void Server::handleRequest(HttpRequest& request) {
 	//    If path ends with / then add default file name like index.html to the path
 	// 3) Read the file request->http->path
 	std::string path;
-	struct stat st;
+	LocationConfig location;
 	int fd;
+	int status;
 	
 	parser_.parse(request.get());
 	request.setRequest(parser_.getRequest());
 
 	log(request);
-	path = config_.root + request.getPath();
+	path = request.getPath();
+	location = resolve_location(request.getURI(), path);
+	status = resolve_path(path, location);
+	std::cout << path << std::endl;
 
-	if (stat(path.c_str(), &st) != 0) {
-		if (errno == ENOENT)
-			return sendError(NOT_FOUND, request);
-        return sendError(FORBIDDEN, request);
-    }
+	if (status == 1)
+		return sendError(NOT_FOUND, request);
+	else if (status == 2)
+		return sendError(FORBIDDEN, request);
 
-    if (S_ISDIR(st.st_mode)) {
-        if (path[path.size() - 1] != '/')
-            return sendError(FORBIDDEN, request);
-        path += "index.html";
-        if (stat(path.c_str(), &st) != 0) {
-            if (errno == ENOENT)
-                return sendError(FORBIDDEN, request);
-            return sendError(FORBIDDEN, request);
-        }
-    }
-
-    if (!S_ISREG(st.st_mode))
-        return sendError(FORBIDDEN, request);
-
-    fd = open(path.c_str(), O_RDONLY);
-    if (fd < 0) {
-        if (errno == EACCES)
-            return sendError(FORBIDDEN, request);
-        return sendError(NOT_FOUND, request);
-    }
 
 	// 1) When no CGI, just simple read file and send it
 	fd = open(path.c_str(), O_RDONLY);
+	if (fd < 0) {
+		return sendError(SERVER_ERROR, request);
+	}
 	request.sendAll(path, fd);
 	close(fd);
-
-
 
 	// response = readFile(path);
 	// 2) If CGI is on, then prepare the enviroment

@@ -32,3 +32,7 @@ const std::string& HttpRequest::getPath() const {
 const std::string& HttpRequest::getMethod() const {
 	return body_.method;
 }
+
+const std::string& HttpRequest::getURI() const {
+	return body_.uri;
+}

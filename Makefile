@@ -16,7 +16,7 @@ INCLUDES = include/
 
 SRC_MAIN   = main.cpp
 SRC_SERVER = server.cpp network.cpp utils.cpp \
-             defaults.cpp
+             defaults.cpp path_resolver.cpp
 SRC_REQUEST = request.cpp network.cpp
 SRC_PARSER = ConfigParser.cpp RequestParser.cpp
 
