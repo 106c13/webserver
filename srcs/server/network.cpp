@@ -2,12 +2,13 @@
 #include <fcntl.h>
 #include "webserv.h"
 
-
+/*
+ * Parse the resquest
+ * Resolve the path
+ * If path ends with / then add default file name like index.html to the path
+ * If autoindex is on and no satisfying page is found, generate autoindex
+*/
 void Server::handleRequest(HttpRequest& request) {
-	// 1) Parse the resquest
-	// 2) Get the file name or directory from request->http->path
-	//    If path ends with / then add default file name like index.html to the path
-	// 3) Read the file request->http->path
 	std::string path;
 	LocationConfig location;
 	int fd;
@@ -18,14 +19,24 @@ void Server::handleRequest(HttpRequest& request) {
 
 	log(request);
 	path = request.getPath();
-	location = resolve_location(request.getURI(), path);
+	location = resolve_location(path);
 	status = resolve_path(path, location);
-	std::cout << path << std::endl;
+	std::cout << path << " " << status << std::endl;
 
-	if (status == 1)
+	if (status == 1) {
+		// If autoindex is on, generate page
+		if (location.autoindex) {
+			return generate_autoindex(request, location);
+		}
+
+		log(INFO, "404 " + path);
 		return sendError(NOT_FOUND, request);
-	else if (status == 2)
+	} else if (status == 2) {
+		return sendError(NOT_FOUND, request);
+	} else if (status == 3) {
+		log(INFO, "403 " + path);
 		return sendError(FORBIDDEN, request);
+	}
 
 
 	// 1) When no CGI, just simple read file and send it

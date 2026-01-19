@@ -7,16 +7,14 @@ CC = cc
 CFLAGS = -Wall -Wextra -Werror
 # ---------------------------------
 
-
-
-
 SRCS_DIR = srcs/
 OBJS_DIR = obj/
 INCLUDES = include/
 
 SRC_MAIN   = main.cpp
 SRC_SERVER = server.cpp network.cpp utils.cpp \
-             defaults.cpp path_resolver.cpp
+             defaults.cpp path_resolver.cpp \
+			 autoindex.cpp
 SRC_REQUEST = request.cpp network.cpp
 SRC_PARSER = ConfigParser.cpp RequestParser.cpp
 

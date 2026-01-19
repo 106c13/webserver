@@ -63,3 +63,35 @@ std::string readFile(const std::string& filename) {
 	close(fd);
 	return content;
 }
+
+std::vector<DirEntry> list_directory(const std::string& path) {
+    std::vector<DirEntry> entries;
+	DirEntry d;
+    DIR* dir = opendir(path.c_str());
+    if (!dir)
+        return entries;
+
+    struct dirent* ent;
+    while ((ent = readdir(dir)) != NULL) {
+        d.name = ent->d_name;
+
+        if (d.name == ".")
+            continue;
+
+        d.is_dir = false;
+
+        if (ent->d_type == DT_DIR) {
+            d.is_dir = true;
+        } else if (ent->d_type == DT_UNKNOWN) {
+            // fallback to stat
+            struct stat st;
+            std::string full = path + "/" + d.name;
+            if (stat(full.c_str(), &st) == 0)
+                d.is_dir = S_ISDIR(st.st_mode);
+        }
+
+        entries.push_back(d);
+    }
+    closedir(dir);
+    return entries;
+}

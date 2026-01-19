@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <exception>
+#include <dirent.h>
 #include "ConfigParser.h"
 #include "RequestParser.h"
 
@@ -30,6 +31,11 @@ enum Page {
 	FORBIDDEN = 1001,
 	SERVER_ERROR = 1002,
 	BAD_REQUEST = 1003
+};
+
+struct DirEntry {
+	std::string name;
+	bool		is_dir;
 };
 
 class	HttpRequest {
@@ -69,7 +75,7 @@ class	Server {
 		int				runCGI(const char* path, const HttpRequest& request);
 		void			handleRequest(HttpRequest&	request);
 		int				resolve_path(std::string& path, LocationConfig& location);
-		LocationConfig&	resolve_location(const std::string& uri, std::string& fs_path);
+		LocationConfig&	resolve_location(std::string& fs_path);
 
 	public:
 		Server(const ServerConfig& config); // Start server with configurations from file
@@ -77,14 +83,15 @@ class	Server {
 
 		void	acceptConnection();
 		void	sendError(int code, HttpRequest& request) const;
+		void	generate_autoindex(HttpRequest& request, LocationConfig& location);
 };
 
-void		log(int type, const std::string& msg);
-void		log(const HttpRequest& request);
-int			get_path_type(const char *path);
-bool		fileExists(const std::string& path);
-bool		canReadFile(const std::string& path);
-ssize_t		getFileSize(const std::string& path);
-std::string	readFile(const std::string& filename);
-
+void					log(int type, const std::string& msg);
+void					log(const HttpRequest& request);
+int						get_path_type(const char *path);
+bool					fileExists(const std::string& path);
+bool					canReadFile(const std::string& path);
+ssize_t					getFileSize(const std::string& path);
+std::string				readFile(const std::string& filename);
+std::vector<DirEntry>	list_directory(const std::string& path);
 #endif

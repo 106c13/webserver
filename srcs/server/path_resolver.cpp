@@ -7,9 +7,12 @@
  * If path is directory, function should add index file 
  *      ex. /var/www/html/folder/ + index.html or index.php
  * If file not exists or server doesn't have access return error
- * 0 - success
- * 1 - not found
- * 2 - forbidden
+ * Returns:
+ *  0 - success
+ *  1 - not found path exists but file not found
+ *  2 - not found path or file not exists, like uri = /unkown/ or /unkown.html
+ *  3 - forbidden
+ *
 */
 int Server::resolve_path(std::string& path, LocationConfig& location) {
     struct stat st;
@@ -18,15 +21,13 @@ int Server::resolve_path(std::string& path, LocationConfig& location) {
     // Check existence / access
     if (stat(path.c_str(), &st) != 0) {
         if (errno == ENOENT)
-            return 1;
-        return 2;
+            return 2;
+        return 3;
     }
 
+    std::cout << "Common " << path << std::endl;
     // If directory
     if (S_ISDIR(st.st_mode)) {
-        if (path[path.size() - 1] != '/')
-            return 2;
-
         for (std::vector<std::string>::iterator it = location.index.begin();
              it != location.index.end();
              ++it) {
@@ -36,7 +37,7 @@ int Server::resolve_path(std::string& path, LocationConfig& location) {
             if (stat(tmp.c_str(), &st) != 0) {
                 if (errno == ENOENT)
                     continue;
-                return 2;
+                return 3;
             }
 
             if (!S_ISREG(st.st_mode))
@@ -52,7 +53,7 @@ int Server::resolve_path(std::string& path, LocationConfig& location) {
 
     // If regular file
     if (!S_ISREG(st.st_mode))
-        return 1;
+        return 2;
 
     return 0;
 }
@@ -64,10 +65,7 @@ int Server::resolve_path(std::string& path, LocationConfig& location) {
  * This function compares uri with each location path and returns closest one
  * If nothing found, returns first one
 */
-LocationConfig& Server::resolve_location(
-    const std::string& uri,
-    std::string& fs_path
-) {
+LocationConfig& Server::resolve_location(std::string& fs_path) {
     LocationConfig* best = NULL;
     size_t best_len = 0;
 
@@ -77,7 +75,7 @@ LocationConfig& Server::resolve_location(
 
         const std::string& loc_path = it->path;
 
-        if (uri.compare(0, loc_path.size(), loc_path) == 0) {
+        if (fs_path.compare(0, loc_path.size(), loc_path) == 0) {
             if (loc_path.size() > best_len) {
                 best = &(*it);
                 best_len = loc_path.size();
@@ -90,7 +88,7 @@ LocationConfig& Server::resolve_location(
         best = &config_.locations[0];
 
     // Build filesystem path
-    fs_path = best->root + "/" + uri.substr(best_len);
+    fs_path = best->root + "/" + fs_path.substr(best_len);
 
     return *best;
 }
