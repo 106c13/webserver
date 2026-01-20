@@ -19,8 +19,8 @@ void Server::handleRequest(HttpRequest& request) {
 
 	log(request);
 	path = request.getPath();
-	location = resolve_location(path);
-	status = resolve_path(path, location);
+	location = resolveLocation(path);
+	status = resolvePath(path, location);
 	std::cout << path << " " << status << std::endl;
 
 	if (status == 1) {

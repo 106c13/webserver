@@ -14,7 +14,7 @@
  *  3 - forbidden
  *
 */
-int Server::resolve_path(std::string& path, LocationConfig& location) {
+int Server::resolvePath(std::string& path, LocationConfig& location) {
     struct stat st;
     std::string tmp;
 
@@ -65,11 +65,11 @@ int Server::resolve_path(std::string& path, LocationConfig& location) {
  * This function compares uri with each location path and returns closest one
  * If nothing found, returns first one
 */
-LocationConfig& Server::resolve_location(std::string& fs_path) {
+LocationConfig& Server::resolveLocation(std::string& fs_path) {
     LocationConfig* best = NULL;
     size_t best_len = 0;
 
-    for (std::vector<LocationConfig>::iterator it = config_.locations.begin();
+    for (LocationList::iterator it = config_.locations.begin();
          it != config_.locations.end();
          ++it) {
 

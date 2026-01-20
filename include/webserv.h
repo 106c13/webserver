@@ -15,6 +15,8 @@
 #define COLOR_RED   "\033[1;31m"
 #define COLOR_RESET "\033[0m"
 
+typedef std::vector<LocationConfig> LocationList;
+
 enum Log {
 	INFO = 10,
 	WARNING = 11,
@@ -74,8 +76,8 @@ class	Server {
 		void			initSocket();
 		int				runCGI(const char* path, const HttpRequest& request);
 		void			handleRequest(HttpRequest&	request);
-		int				resolve_path(std::string& path, LocationConfig& location);
-		LocationConfig&	resolve_location(std::string& fs_path);
+		int				resolvePath(std::string& path, LocationConfig& location);
+		LocationConfig&	resolveLocation(std::string& fs_path);
 
 	public:
 		Server(const ServerConfig& config); // Start server with configurations from file
