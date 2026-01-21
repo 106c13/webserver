@@ -122,15 +122,3 @@ int HttpRequest::sendAll(const std::string& path, int fd) {
     }
     return bytesRead == 0 ? 1 : 0; // return 1 if fully sent, 0 otherwise
 }
-
-const std::string& HttpRequest::get() {
-	return content_;
-}
-
-const std::string& HttpRequest::getFile() const {
-	return file_;
-}
-
-void HttpRequest::setFile(const std::string& file) {
-	file_ = file;
-}

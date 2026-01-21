@@ -9,17 +9,18 @@ int main(int argc, char **argv) {
 		return 1;
     }
 
-	ConfigParser parser;
-	parser.parse(argv[1]);
-	parser.print();
-    const struct Config config = parser.getConfig();
 
     try {
+		ConfigParser parser;
+		parser.parse(argv[1]);
+		parser.print();
+   		const struct Config config = parser.getConfig();
 		Server  server(config.servers[0]);
 		int i = 0;
-		while (i++ < 10) {
+		while (i < 10) {
 			try {
 				server.acceptConnection();
+				i++;
 				while (waitpid(-1, NULL, WNOHANG) > 0) {}
             } catch (const std::exception& e) {
 				log(ERROR, e.what()); 
