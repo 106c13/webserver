@@ -9,12 +9,12 @@ int main(int argc, char **argv) {
 		return 1;
     }
 
-	ConfigParser parser;
-	parser.parse(argv[1]);
-	parser.print();
-    const struct Config config = parser.getConfig();
 
     try {
+		ConfigParser parser;
+		parser.parse(argv[1]);
+		parser.print();
+   		const struct Config config = parser.getConfig();
 		Server  server(config.servers[0]);
 		int i = 0;
 		while (i < 10) {

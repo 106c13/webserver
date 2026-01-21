@@ -26,7 +26,7 @@ void Server::handleRequest(HttpRequest& request) {
 	if (status == 1) {
 		// If autoindex is on, generate page
 		if (location.autoindex) {
-			return generate_autoindex(request, location);
+			return generateAutoindex(request, location);
 		}
 
 		log(INFO, "404 " + path);

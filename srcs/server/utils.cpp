@@ -64,7 +64,7 @@ std::string readFile(const std::string& filename) {
 	return content;
 }
 
-std::vector<DirEntry> list_directory(const std::string& path) {
+std::vector<DirEntry> listDirectory(const std::string& path) {
     std::vector<DirEntry> entries;
 	DirEntry d;
     DIR* dir = opendir(path.c_str());

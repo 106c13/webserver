@@ -1,7 +1,7 @@
 #include <dirent.h>
 #include "webserv.h"
 
-void Server::generate_autoindex(HttpRequest& request, LocationConfig& location) {
+void Server::generateAutoindex(HttpRequest& request, LocationConfig& location) {
     std::string path = request.getURI();
     std::string page;
     std::vector<DirEntry> dirs;
@@ -20,7 +20,7 @@ void Server::generate_autoindex(HttpRequest& request, LocationConfig& location) 
     page += "  <h1>Index of " + path + "</h1>\n";
     page += "  <hr>\n";
 
-    dirs = list_directory(location.root + path);
+    dirs = listDirectory(location.root + path);
     for (std::vector<DirEntry>::iterator it = dirs.begin();
          it != dirs.end();
          it++) {

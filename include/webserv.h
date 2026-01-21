@@ -85,7 +85,7 @@ class	Server {
 
 		void	acceptConnection();
 		void	sendError(int code, HttpRequest& request) const;
-		void	generate_autoindex(HttpRequest& request, LocationConfig& location);
+		void	generateAutoindex(HttpRequest& request, LocationConfig& location);
 };
 
 void					log(int type, const std::string& msg);
@@ -95,5 +95,5 @@ bool					fileExists(const std::string& path);
 bool					canReadFile(const std::string& path);
 ssize_t					getFileSize(const std::string& path);
 std::string				readFile(const std::string& filename);
-std::vector<DirEntry>	list_directory(const std::string& path);
+std::vector<DirEntry>	listDirectory(const std::string& path);
 #endif
