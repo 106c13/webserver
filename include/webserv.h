@@ -90,7 +90,7 @@ class	Server {
 
 void					log(int type, const std::string& msg);
 void					log(const HttpRequest& request);
-int						get_path_type(const char *path);
+
 bool					fileExists(const std::string& path);
 bool					canReadFile(const std::string& path);
 ssize_t					getFileSize(const std::string& path);
