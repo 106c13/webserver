@@ -1,26 +1,14 @@
 #include <sstream>
+#include <fcntl.h>
 #include <poll.h>
 #include "webserv.h"
 
-int HttpRequest::sendAll(const int fd) {
+int HttpRequest::sendChunked(const int fd) {
 	ssize_t bytesRead;
 	char buf[1024];
 	struct pollfd pfd;
 	pfd.fd = request_fd_;
 	pfd.events = POLLOUT;
-
-	// ============= TEST ===============
-	std::stringstream ss;
-	ss << "HTTP/1.1 200 OK\r\n";
-	ss << "Content-Type: text/html\r\n";
-	ss << "Transfer-Encoding: chunked\r\n";
-	ss << "Connection: close\r\n\r\n";
-
-	if (poll(&pfd, 1, -1) <= 0)
-		return -1;
-	if (send(request_fd_, ss.str().c_str(), ss.str().size(), 0) <= 0)
-		return -1;
-	// ==================================
 
 	while (true) {
 		bytesRead = read(fd, buf, sizeof(buf));
@@ -50,75 +38,96 @@ int HttpRequest::sendAll(const int fd) {
 	return 1;
 }
 
-int HttpRequest::sendAll(const std::string& response) {
-	size_t total = 0;
-	size_t len = response.size();
-	ssize_t n;
-	const char* buf = response.c_str();
+int HttpRequest::sendFile(const std::string& path)
+{
+    char    buf[1024];
+    ssize_t bytes_read;
+    int     fd;
 
-	struct pollfd pfd;
-	pfd.fd = request_fd_;
-	pfd.events = POLLOUT;
+    if (!fileExists(path) || !canReadFile(path)) {
+        log(WARNING, "Error page \"" + path + "\" not found");
+        return -1;
+    }
+    fd = open(path.c_str(), O_RDONLY);
 
-	//========== TEST ================
-	std::stringstream	ss;
-	ss << "HTTP/1.1 200 Ok\r\n";
-	ss << "Content-Type: text/html\r\n";
-	ss << "Content-Length: " << response.size() << "\n";
-	ss << "Connection: close\r\n\n";
-	if (poll(&pfd, 1, -1) <= 0)
-		return 0;
-	send(request_fd_, ss.str().c_str(), 83, 0);
-	//========== TEST ================
+    /* ---------- send header ---------- */
+    setContentLength(getFileSize(path));
 
-	while (total < len) {
-		pfd.revents = 0;
+    char* header = generateHeader(res_);
+    if (!sendAll(header, std::strlen(header))) {
+        delete[] header;
+        close(fd);
+        return -1;
+    }
+    delete[] header;
 
-		if (poll(&pfd, 1, -1) <= 0)
-			return 0;
-
-		if (pfd.revents & POLLOUT) {
-			n = send(request_fd_, buf + total, len - total, 0);
-			if (n <= 0)
-				return 0;
-
-			total += n;
-		}
-	}
-	return 1;
-}
-
-int HttpRequest::sendAll(const std::string& path, int fd) {
-    ssize_t totalFileSize = getFileSize(path);
-    char buf[1024];
+    /* ---------- send file body ---------- */
     struct pollfd pfd;
     pfd.fd = request_fd_;
     pfd.events = POLLOUT;
 
-    std::stringstream ss;
-    ss << "HTTP/1.1 200 OK\r\n";
-    ss << "Content-Type: text/html\r\n";
-    ss << "Content-Length: " << totalFileSize << "\r\n";
-    ss << "Connection: close\r\n\r\n";
+    while (true) {
+        bytes_read = read(fd, buf, sizeof(buf));
+        if (bytes_read < 0)
+            return close(fd), -1;
 
-    if (poll(&pfd, 1, -1) <= 0)
-        return 0;
-    if (send(request_fd_, ss.str().c_str(), ss.str().size(), 0) <= 0)
-        return 0;
+        if (bytes_read == 0)
+            break;
 
-    ssize_t bytesRead;
-    while ((bytesRead = read(fd, buf, sizeof(buf))) > 0) {
-        ssize_t totalSent = 0;
-        while (totalSent < bytesRead) {
+        size_t total_sent = 0;
+        while (total_sent < (size_t)bytes_read) {
+            pfd.revents = 0;
+
             if (poll(&pfd, 1, -1) <= 0)
-                return 0;
-            if (pfd.revents & POLLOUT) {
-                ssize_t sent = send(request_fd_, buf + totalSent, bytesRead - totalSent, 0);
-                if (sent <= 0)
-                    return 0;
-                totalSent += sent;
-            }
+                return close(fd), -1;
+
+            if (!(pfd.revents & POLLOUT))
+                return close(fd), -1;
+
+            ssize_t sent = send(
+                request_fd_,
+                buf + total_sent,
+                bytes_read - total_sent,
+                0
+            );
+            if (sent <= 0)
+                return close(fd), -1;
+
+            total_sent += sent;
         }
     }
-    return bytesRead == 0 ? 1 : 0; // return 1 if fully sent, 0 otherwise
+
+    close(fd);
+    return 1;
+}
+
+
+int HttpRequest::sendAll(const std::string& response)
+{
+    return sendAll(response.c_str(), response.size());
+}
+
+int HttpRequest::sendAll(const char* buf, size_t len)
+{
+    size_t total = 0;
+    ssize_t n;
+
+    struct pollfd pfd;
+    pfd.fd = request_fd_;
+    pfd.events = POLLOUT;
+
+    while (total < len) {
+        pfd.revents = 0;
+
+        if (poll(&pfd, 1, -1) <= 0)
+            return 0;
+
+        if (pfd.revents & POLLOUT) {
+            n = send(request_fd_, buf + total, len - total, 0);
+            if (n <= 0)
+                return 0;
+            total += n;
+        }
+    }
+    return 1;
 }

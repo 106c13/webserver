@@ -1,11 +1,13 @@
 #include <sstream>
+#include <cstring>
+#include <fcntl.h>
 #include "webserv.h"
+#include "HeaderGenerator.h"
 
-void Server::sendError(int code, HttpRequest& request) const {
-	std::string			page;
-
+static const char* generateDefaultPage(int code, size_t* pageSize) {
 	if (code == NOT_FOUND) {
-		page =
+		*pageSize = 224;
+		return
 "<!DOCTYPE html>\n\
 <html>\n\
 <head>\n\
@@ -20,7 +22,9 @@ void Server::sendError(int code, HttpRequest& request) const {
 </body>\n\
 </html>";
 	} else if (code == FORBIDDEN) {
-		page = "<!DOCTYPE html>\n\
+		*pageSize = 223;
+		return
+"<!DOCTYPE html>\n\
 <html>\n\
 <head>\n\
 	<meta charset=\"UTF-8\">\n\
@@ -34,7 +38,9 @@ void Server::sendError(int code, HttpRequest& request) const {
 </body>\n\
 </html>";
 	} else if (code == SERVER_ERROR) {
-		page = "<!DOCTYPE html>\n\
+		*pageSize = 297;
+		return
+"<!DOCTYPE html>\n\
 <html>\n\
 <head>\n\
 	<meta charset=\"UTF-8\">\n\
@@ -48,5 +54,30 @@ void Server::sendError(int code, HttpRequest& request) const {
 </body>\n\
 </html>";
 	}
-	request.sendAll(page.c_str());
+	log(ERROR, "Unkown error code");
+	return "";
+}
+
+void Server::sendError(int code, HttpRequest& request) const {
+	const char* page;
+	const char* header;
+	size_t		pageSize;
+	std::string path;
+	std::map<int, std::string>::const_iterator it = config_.errorPages.find(code);
+
+	request.setStatus(code);
+	if (it != config_.errorPages.end())
+		path = it->second;
+
+	if (!path.empty()) {
+		if (request.sendFile(path) > 0)
+			return;
+	}
+
+	page = generateDefaultPage(code, &pageSize);
+	request.setContentLength(pageSize);
+	header = generateHeader(request.getResponse());
+	request.sendAll(header, std::strlen(header));
+	request.sendAll(page, pageSize);
+	delete[] header;
 }
