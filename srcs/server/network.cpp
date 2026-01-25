@@ -2,7 +2,6 @@
 #include <string>
 #include "webserv.h"
 
-
 void Server::sendRedirect(HttpRequest& request, std::string url) {
 	std::string redirectHeader;
 
@@ -33,9 +32,7 @@ void Server::handleRequest(HttpRequest& request) {
 	log(request);
 	path = request.getPath();
 	location = resolveLocation(path);
-	if (location.redirectCode != 0 && 1 == 2) {
-		return sendRedirect(request, location.redirectUrl);
-	}
+
 	status = resolvePath(path, location);
 	std::cout << path << " " << status << std::endl;
 

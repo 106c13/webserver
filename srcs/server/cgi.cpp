@@ -16,8 +16,7 @@ static char** createEviroment(const HttpRequest& request)
     return env;
 }
 
-int Server::runCGI(const char* path, const char* cgiPath, const HttpRequest& request)
-{
+int Server::runCGI(const char* path, const char* cgiPath, const HttpRequest& request){
 	int		pipefd[2];
 	pid_t	pid;
 	char**	env;

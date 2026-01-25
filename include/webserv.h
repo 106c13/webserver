@@ -8,6 +8,8 @@
 #include <unistd.h>
 #include <exception>
 #include <dirent.h>
+#include <cstddef>
+#include <cstring> 
 #include "ConfigParser.h"
 #include "RequestParser.h"
 #include "HeaderGenerator.h"

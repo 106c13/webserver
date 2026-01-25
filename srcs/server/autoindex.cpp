@@ -7,7 +7,6 @@ void Server::generateAutoindex(HttpRequest& request, LocationConfig& location) {
     std::vector<DirEntry> dirs;
     const char* header;
 
-
     if (path[path.length() - 1] != '/')
         path += '/';
 
