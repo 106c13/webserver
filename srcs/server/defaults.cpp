@@ -5,7 +5,23 @@
 #include "HeaderGenerator.h"
 
 static const char* generateDefaultPage(int code, size_t* pageSize) {
-	if (code == NOT_FOUND) {
+	if (code == BAD_REQUEST) {
+		*pageSize = 228;
+		return 
+"<!DOCTYPE html>\n\
+<html>\n\
+<head>\n\
+	<meta charset=\"UTF-8\">\n\
+	<title>400 Bad request</title>\n\
+</head>\n\
+<body>\n\
+	<h1>400 Bad request</h1>\n\
+	<p>The requested resource was not found on this server.</p>\n\
+	<hr>\n\
+	<p>WebServ 42</p>\n\
+</body>\n\
+</html>";
+	} else if (code == NOT_FOUND) {
 		*pageSize = 224;
 		return
 "<!DOCTYPE html>\n\
@@ -76,6 +92,7 @@ void Server::sendError(int code, HttpRequest& request) const {
 
 	page = generateDefaultPage(code, &pageSize);
 	request.setContentLength(pageSize);
+    request.setContentType("text/html");
 	header = generateHeader(request.getResponse());
 	request.sendAll(header, std::strlen(header));
 	request.sendAll(page, pageSize);

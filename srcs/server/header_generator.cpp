@@ -5,6 +5,8 @@
 static std::string getStatus(int code) {
     if (code == OK) {
         return "200 OK";
+    } else if (code == REDIRECT) {
+        return "301 Moved Permanently";
     } else if (code == BAD_REQUEST) {
         return "400 Bad Request";
     } else if (code == FORBIDDEN) {
@@ -18,9 +20,27 @@ static std::string getStatus(int code) {
     }
 }
 
+static std::string resolveContentType(const std::string& ext) {
+    if (ext == "css")
+        return "text/css";
+    if (ext == "js")
+        return "text/javascript";
+    if (ext == "png")
+        return "image/png";
+    if (ext == "jpg" || ext == "jpeg")
+        return "image/jpeg";
+    if (ext == "gif")
+        return "image/gif";
+    if (ext == "html")
+        return "text/html";
+    return "application/octet-stream";
+}
+
 char* generateHeader(const struct Response& res)
 {
     std::string header;
+    std::string contentType;
+    std::string ext;
 
     header += res.version;
     header += " ";
@@ -28,22 +48,19 @@ char* generateHeader(const struct Response& res)
     header += "\r\n";
 
     if (!res.contentType.empty()) {
-        header += "Content-Type: ";
-        header += res.contentType;
-        header += "\r\n";
+        contentType = res.contentType;
+    } else {
+        size_t dot = res.path.rfind('.');
+        if (dot != std::string::npos && dot + 1 < res.path.size())
+            ext = res.path.substr(dot + 1);
+        contentType = resolveContentType(ext);
     }
 
-    if (!res.contentLength.empty()) {
-        header += "Content-Length: ";
-        header += res.contentLength;
-        header += "\r\n";
-    }
+    if (!res.location.empty())
+        header += "Location: " + res.location + "\r\n";
 
-    if (!res.connectionType.empty()) {
-        header += "Connection: ";
-        header += res.connectionType;
-        header += "\r\n";
-    }
+    header += "Content-Type: " + contentType + "\r\n";
+    header += "Content-Length: " + res.contentLength + "\r\n";
 
     if (res.cookie) {
         header += "Set-Cookie: ";
@@ -51,6 +68,7 @@ char* generateHeader(const struct Response& res)
         header += "\r\n";
     }
 
+    header += "Connection: " + res.connectionType + "\r\n";
     header += "\r\n";
 
     char* result = new char[header.size() + 1];

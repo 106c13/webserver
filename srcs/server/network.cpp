@@ -1,13 +1,36 @@
 #include <fcntl.h>
 #include <string>
 #include "webserv.h"
+#include "ConfigParser.h"
 
-void Server::sendRedirect(HttpRequest& request, std::string url) {
-	std::string redirectHeader;
+void Server::sendRedirect(HttpRequest& request, const LocationConfig& location) {
+	char* header;
 
-	redirectHeader = "HTTP/1.1 301\n";
-	redirectHeader += "Location: " + url + "\n";
-	request.sendAll(redirectHeader);
+	request.setStatus(location.redirectCode);
+	request.setLocation(location.redirectUrl);
+	header = generateHeader(request.getResponse());
+	request.sendAll(header);
+	delete[] header;
+}
+
+int checkRequest(const Request& request, const LocationConfig& location)
+{
+	if (location.methods.empty()) {
+		if (request.method == "GET" ||
+			request.method == "POST" ||
+			request.method == "DELETE")
+			return 1;
+        return 0;
+	}
+
+    for (std::vector<std::string>::const_iterator it = location.methods.begin();
+         it != location.methods.end();
+         ++it)
+    {
+        if (*it == request.method)
+            return 1;
+    }
+    return 0;
 }
 
 /*
@@ -32,9 +55,12 @@ void Server::handleRequest(HttpRequest& request) {
 	log(request);
 	path = request.getPath();
 	location = resolveLocation(path);
-
+	if (!checkRequest(request.getRequest(), location))
+		return sendError(BAD_REQUEST, request);
+	if (location.redirectCode != 0) {
+		return sendRedirect(request, location);
+	}
 	status = resolvePath(path, location);
-	std::cout << path << " " << status << std::endl;
 
 	if (status == 1) {
 		// If autoindex is on, generate page
@@ -55,7 +81,6 @@ void Server::handleRequest(HttpRequest& request) {
 	if (!cgiPath.empty()) {
 		return sendError(SERVER_ERROR, request);
 		fd = runCGI(path.c_str(), cgiPath.c_str(), request);
-		std::cout << "fd=" << fd << std::endl;
 		if (fd < 0)
 			return sendError(SERVER_ERROR, request);
 		//request.sendChunked(fd);

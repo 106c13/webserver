@@ -7,19 +7,23 @@
 #include "defines.h"
 
 struct Response {
+    std::string path;
     std::string version;
 	int status;
     std::string contentType;
     std::string contentLength;
     std::string connectionType;
+    std::string location;
     SetCookie*  cookie;
 
     Response()
-        : version("HTTP/1.1"),
+        : path(""),
+          version("HTTP/1.1"),
           status(OK),
-          contentType("text/html"),
+          contentType(""),
           contentLength(""),
           connectionType("close"),
+          location(""),
           cookie(NULL)
     {}
 };

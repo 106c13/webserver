@@ -56,7 +56,6 @@ std::string Server::findCGI(const std::string& fileName, const std::map<std::str
 			break;
 		}
 	}
-	std::cout << extension << std::endl;
 	if (extension.empty())
         return "";
 	std::map<std::string, std::string>::const_iterator it = cgiMap.find(extension);

@@ -49,6 +49,7 @@ class	HttpRequest {
 		void					setContentType(const std::string& s);
 		void					setContentLength(size_t len);
 		void					setConnectionType(const std::string& s);
+		void					setLocation(const std::string& s);
 		const struct Response&	getResponse();
 
 		const std::string&		getContent();
@@ -74,7 +75,7 @@ class	Server {
 		int				resolvePath(std::string& path, LocationConfig& location);
 		LocationConfig&	resolveLocation(std::string& fs_path);
 		void			generateAutoindex(HttpRequest& request, LocationConfig& location);
-		void			sendRedirect(HttpRequest& request, std::string url);
+		void			sendRedirect(HttpRequest& request, const LocationConfig& location);
 		std::string		findCGI(const std::string& fileName, const std::map<std::string, std::string>& cgiMap);
 		std::string		findErrorPage(int code) const;
 

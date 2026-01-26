@@ -52,6 +52,10 @@ void HttpRequest::setContentType(const std::string& s) {
     res_.contentType = s;
 }
 
+void HttpRequest::setLocation(const std::string& s) {
+    res_.location = s;
+}
+
 void HttpRequest::setContentLength(size_t len) {
     std::stringstream ss;
     ss << len;

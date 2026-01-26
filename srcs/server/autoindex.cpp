@@ -28,6 +28,7 @@ void Server::generateAutoindex(HttpRequest& request, LocationConfig& location) {
     }
     page += "</body></html>";
     request.setContentLength(page.size());
+    request.setContentType("text/html");
 	header = generateHeader(request.getResponse());
 	request.sendAll(header, std::strlen(header));
     request.sendAll(page);
