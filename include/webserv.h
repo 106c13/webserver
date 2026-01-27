@@ -8,32 +8,18 @@
 #include <unistd.h>
 #include <exception>
 #include <dirent.h>
+#include <cstddef>
+#include <cstring> 
 #include "ConfigParser.h"
 #include "RequestParser.h"
+#include "HeaderGenerator.h"
+#include "defines.h"
 
 #define COLOR_GREEN "\033[1;32m"
 #define COLOR_RED   "\033[1;31m"
+#define COLOR_YELLOW "\033[1;33m"
 #define COLOR_RESET "\033[0m"
 
-typedef std::vector<LocationConfig> LocationList;
-
-enum Log {
-	INFO = 10,
-	WARNING = 11,
-	ERROR = 12
-};
-
-enum Method {
-	GET = 358774,
-	POST = 101
-};
-
-enum Page {
-	NOT_FOUND = 1000,
-	FORBIDDEN = 1001,
-	SERVER_ERROR = 1002,
-	BAD_REQUEST = 1003
-};
 
 struct DirEntry {
 	std::string name;
@@ -45,24 +31,34 @@ class	HttpRequest {
 		// I don't know
 		int			request_fd_;
 		std::string content_;
-		Request		body_;
+		Request		req_;
+		Response	res_;
 	public:
 		HttpRequest(int	fd);
 		~HttpRequest();
 
-		void				setRequest(const Request& request);
-		void				setFile(const std::string& file);
+		// Request
+		void					setRequest(const Request& request);
+		void					setPath(const std::string& file);
+		const struct Request&	getRequest();
+		const std::string&		getPath() const;
+		const std::string&		getMethod() const;
+		const std::string&		getURI() const;
+		// Response
+		void					setStatus(int code);
+		void					setContentType(const std::string& s);
+		void					setContentLength(size_t len);
+		void					setConnectionType(const std::string& s);
+		void					setLocation(const std::string& s);
+		const struct Response&	getResponse();
 
-		const std::string&	get(); // I don't know what to write here
-		const std::string&	getPath() const;
-		const std::string&	getMethod() const;
-		const std::string&	getURI() const;
+		const std::string&		getContent();
 
-		int					sendAll(const std::string& response);
-		int					sendAll(const std::string& path, int fd);
-		int					sendAll(const int fd);
+		int						sendAll(const std::string& response);
+		int						sendAll(const char* buf, size_t len);
+		int						sendChunked(const int fd);
+		int						sendFile(const std::string& path);
 };
-
 class	Server {
 	private:
 		// config
@@ -74,18 +70,21 @@ class	Server {
 		sockaddr_in	addr_;
 
 		void			initSocket();
-		int				runCGI(const char* path, const HttpRequest& request);
+		int				runCGI(const char* path, const char* cgiPath, const HttpRequest& request);
 		void			handleRequest(HttpRequest&	request);
 		int				resolvePath(std::string& path, LocationConfig& location);
 		LocationConfig&	resolveLocation(std::string& fs_path);
+		void			generateAutoindex(HttpRequest& request, LocationConfig& location);
+		void			sendRedirect(HttpRequest& request, const LocationConfig& location);
+		std::string		findCGI(const std::string& fileName, const std::map<std::string, std::string>& cgiMap);
+		std::string		findErrorPage(int code) const;
 
 	public:
 		Server(const ServerConfig& config); // Start server with configurations from file
 		~Server();
 
-		void	acceptConnection();
-		void	sendError(int code, HttpRequest& request) const;
-		void	generateAutoindex(HttpRequest& request, LocationConfig& location);
+		void		acceptConnection();
+		void		sendError(int code, HttpRequest& request) const;
 };
 
 void					log(int type, const std::string& msg);
