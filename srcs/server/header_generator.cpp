@@ -36,8 +36,7 @@ static std::string resolveContentType(const std::string& ext) {
     return "application/octet-stream";
 }
 
-char* generateHeader(const struct Response& res)
-{
+char* generateHeader(const struct Response& res) {
     std::string header;
     std::string contentType;
     std::string ext;

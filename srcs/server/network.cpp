@@ -13,8 +13,7 @@ void Server::sendRedirect(HttpRequest& request, const LocationConfig& location) 
 	delete[] header;
 }
 
-int checkRequest(const Request& request, const LocationConfig& location)
-{
+int checkRequest(const Request& request, const LocationConfig& location) {
 	if (location.methods.empty()) {
 		if (request.method == "GET" ||
 			request.method == "POST" ||

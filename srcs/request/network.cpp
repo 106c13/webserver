@@ -38,8 +38,7 @@ int HttpRequest::sendChunked(const int fd) {
 	return 1;
 }
 
-int HttpRequest::sendFile(const std::string& path)
-{
+int HttpRequest::sendFile(const std::string& path) {
     char    buf[1024];
     ssize_t bytes_read;
     int     fd;
@@ -102,13 +101,11 @@ int HttpRequest::sendFile(const std::string& path)
 }
 
 
-int HttpRequest::sendAll(const std::string& response)
-{
+int HttpRequest::sendAll(const std::string& response) {
     return sendAll(response.c_str(), response.size());
 }
 
-int HttpRequest::sendAll(const char* buf, size_t len)
-{
+int HttpRequest::sendAll(const char* buf, size_t len) {
     size_t total = 0;
     ssize_t n;
 
