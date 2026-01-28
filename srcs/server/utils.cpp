@@ -10,10 +10,15 @@ void log(int type, const std::string& msg) {
 				  << msg
 				  << COLOR_RESET
 				  << std::endl;
-	}
-	else if (type == ERROR) {
+	} else if (type == ERROR) {
 		std::cerr << COLOR_RED
 				  << "[ERROR] "
+				  << msg
+				  << COLOR_RESET
+				  << std::endl;
+	} else if (type == WARNING) {
+		std::cerr << COLOR_YELLOW
+				  << "[WARNING] "
 				  << msg
 				  << COLOR_RESET
 				  << std::endl;

@@ -5,7 +5,7 @@ void Server::generateAutoindex(HttpRequest& request, LocationConfig& location) {
     std::string path = request.getURI();
     std::string page;
     std::vector<DirEntry> dirs;
-
+    const char* header;
 
     if (path[path.length() - 1] != '/')
         path += '/';
@@ -27,5 +27,10 @@ void Server::generateAutoindex(HttpRequest& request, LocationConfig& location) {
         page += "<a href=\"" + path + it->name + "\">" + it->name + "</a><br>\n";
     }
     page += "</body></html>";
+    request.setContentLength(page.size());
+    request.setContentType("text/html");
+	header = generateHeader(request.getResponse());
+	request.sendAll(header, std::strlen(header));
     request.sendAll(page);
+    delete[] header;
 }

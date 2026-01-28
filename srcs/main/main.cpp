@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
 		while (i < 10) {
 			try {
 				server.acceptConnection();
-				i++;
+				//i++;
 				while (waitpid(-1, NULL, WNOHANG) > 0) {}
             } catch (const std::exception& e) {
 				log(ERROR, e.what()); 
