@@ -65,6 +65,7 @@ private:
 	void		parseServer();
 	void		parseLocation(ServerConfig& server);
 	long long	parseSize(const std::string& size);
+	std::string	stripQuotes(const std::string& str);
 public:
 	ConfigParser();
 	ConfigParser(const std::string& filename);
