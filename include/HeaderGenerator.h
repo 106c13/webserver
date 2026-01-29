@@ -14,6 +14,7 @@ struct Response {
     std::string contentLength;
     std::string connectionType;
     std::string location;
+    std::string contentDisposition;
     SetCookie*  cookie;
 
     Response()
@@ -24,6 +25,7 @@ struct Response {
           contentLength(""),
           connectionType("close"),
           location(""),
+          contentDisposition(""),
           cookie(NULL)
     {}
 };
