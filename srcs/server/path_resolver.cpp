@@ -1,5 +1,6 @@
 #include <cerrno>
 #include <sys/stat.h>
+#include <unistd.h>
 #include "webserv.h"
 
 /*
@@ -9,8 +10,8 @@
  * If file not exists or server doesn't have access return error
  * Returns:
  *  0 - success
- *  1 - not found path exists but file not found
- *  2 - not found path or file not exists, like uri = /unkown/ or /unkown.html
+ *  1 - path exists but file not found
+ *  2 - path or file not exists, like uri = /unkown/ or /unkown.html
  *  3 - forbidden
  *
 */
@@ -21,18 +22,22 @@ int Server::resolvePath(std::string& path, LocationConfig& location) {
     // Check existence / access
     if (stat(path.c_str(), &st) != 0) {
         if (errno == ENOENT)
-            return 2;
-        return 3;
+            return 2;  // Not found
+        return 3;      // Forbidden or other error
     }
 
-    std::cout << "Common " << path << std::endl;
-    // If directory
     if (S_ISDIR(st.st_mode)) {
+        if (access(path.c_str(), R_OK | X_OK) != 0)
+            return 3;
+
         for (std::vector<std::string>::iterator it = location.index.begin();
              it != location.index.end();
              ++it) {
 
-            tmp = path + *it;
+            tmp = path;
+            if (!tmp.empty() && tmp[tmp.size() - 1] != '/')
+                tmp += "/";
+            tmp += *it;
 
             if (stat(tmp.c_str(), &st) != 0) {
                 if (errno == ENOENT)
@@ -43,18 +48,19 @@ int Server::resolvePath(std::string& path, LocationConfig& location) {
             if (!S_ISREG(st.st_mode))
                 continue;
 
+            if (access(tmp.c_str(), R_OK) != 0)
+                return 3;
+
             path = tmp;
             return 0;
         }
-
-        // Directory exists but no index file
         return 1;
     }
 
-    // If regular file
     if (!S_ISREG(st.st_mode))
         return 2;
-
+    if (access(path.c_str(), R_OK) != 0)
+        return 3;
     return 0;
 }
 
