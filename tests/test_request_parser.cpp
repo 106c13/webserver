@@ -1,4 +1,5 @@
 #include "RequestParser.h"
+#include "HeaderGenerator.h"
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
@@ -6,8 +7,7 @@
 static int g_tests_passed = 0;
 static int g_tests_failed = 0;
 
-static void test_assert(bool condition, const char *test_name)
-{
+static void test_assert(bool condition, const char *test_name) {
 	if (condition) {
 		std::cout << "[PASS] " << test_name << std::endl;
 		g_tests_passed++;
@@ -18,8 +18,7 @@ static void test_assert(bool condition, const char *test_name)
 }
 
 /* Test 1: Parse GET method */
-static void test_get_method(void)
-{
+static void test_get_method(void) {
 	const char *raw =
 		"GET /index.html HTTP/1.1\r\n"
 		"Host: localhost\r\n"
@@ -33,8 +32,7 @@ static void test_get_method(void)
 }
 
 /* Test 2: Parse POST method */
-static void test_post_method(void)
-{
+static void test_post_method(void) {
 	const char *raw =
 		"POST /submit HTTP/1.1\r\n"
 		"Host: localhost\r\n"
@@ -48,8 +46,7 @@ static void test_post_method(void)
 }
 
 /* Test 3: Parse DELETE method */
-static void test_delete_method(void)
-{
+static void test_delete_method(void) {
 	const char *raw =
 		"DELETE /files/doc.pdf HTTP/1.1\r\n"
 		"Host: localhost\r\n"
@@ -63,8 +60,7 @@ static void test_delete_method(void)
 }
 
 /* Test 4: Parse URI */
-static void test_uri_parsing(void)
-{
+static void test_uri_parsing(void) {
 	const char *raw =
 		"GET /path/to/resource HTTP/1.1\r\n"
 		"Host: localhost\r\n"
@@ -79,8 +75,7 @@ static void test_uri_parsing(void)
 }
 
 /* Test 5: Parse HTTP version */
-static void test_http_version(void)
-{
+static void test_http_version(void) {
 	const char *raw =
 		"GET / HTTP/1.1\r\n"
 		"Host: localhost\r\n"
@@ -94,8 +89,7 @@ static void test_http_version(void)
 }
 
 /* Test 6: Parse headers */
-static void test_headers(void)
-{
+static void test_headers(void) {
 	const char *raw =
 		"GET / HTTP/1.1\r\n"
 		"Host: localhost:8080\r\n"
@@ -114,8 +108,7 @@ static void test_headers(void)
 }
 
 /* Test 7: Parse query string */
-static void test_query_string(void)
-{
+static void test_query_string(void) {
 	const char *raw =
 		"GET /search?q=test&page=1 HTTP/1.1\r\n"
 		"Host: localhost\r\n"
@@ -130,8 +123,7 @@ static void test_query_string(void)
 }
 
 /* Test 8: Parse query parameters */
-static void test_query_params(void)
-{
+static void test_query_params(void) {
 	const char *raw =
 		"GET /login?username=admin&password=secret HTTP/1.1\r\n"
 		"Host: localhost\r\n"
@@ -147,8 +139,7 @@ static void test_query_params(void)
 }
 
 /* Test 9: Parse body */
-static void test_body(void)
-{
+static void test_body(void) {
 	const char *raw =
 		"POST /submit HTTP/1.1\r\n"
 		"Host: localhost\r\n"
@@ -164,8 +155,7 @@ static void test_body(void)
 }
 
 /* Test 10: Parse form body */
-static void test_form_body(void)
-{
+static void test_form_body(void) {
 	const char *raw =
 		"POST /login HTTP/1.1\r\n"
 		"Host: localhost\r\n"
@@ -182,8 +172,7 @@ static void test_form_body(void)
 }
 
 /* Test 11: Parse cookies */
-static void test_cookies(void)
-{
+static void test_cookies(void) {
 	const char *raw =
 		"GET /profile HTTP/1.1\r\n"
 		"Host: localhost\r\n"
@@ -202,8 +191,7 @@ static void test_cookies(void)
 }
 
 /* Test 12: Parse Set-Cookie */
-static void test_set_cookie(void)
-{
+static void test_set_cookie(void) {
 	const char *raw =
 		"HTTP/1.1 200 OK\r\n"
 		"Set-Cookie: session_id=abc123; Path=/; HttpOnly\r\n"
@@ -221,8 +209,7 @@ static void test_set_cookie(void)
 }
 
 /* Test 13: Parse Set-Cookie with Secure */
-static void test_set_cookie_secure(void)
-{
+static void test_set_cookie_secure(void) {
 	const char *raw =
 		"HTTP/1.1 200 OK\r\n"
 		"Set-Cookie: token=xyz; Secure; SameSite=Strict\r\n"
@@ -237,8 +224,7 @@ static void test_set_cookie_secure(void)
 }
 
 /* Test 14: Parse multipart form data */
-static void test_multipart(void)
-{
+static void test_multipart(void) {
 	const char *raw =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
@@ -262,8 +248,7 @@ static void test_multipart(void)
 }
 
 /* Test 15: Parse multipart data content */
-static void test_multipart_data(void)
-{
+static void test_multipart_data(void) {
 	const char *raw =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
@@ -283,8 +268,7 @@ static void test_multipart_data(void)
 }
 
 /* Test 16: Parse Authorization header */
-static void test_authorization_header(void)
-{
+static void test_authorization_header(void) {
 	const char *raw =
 		"DELETE /files/doc.pdf HTTP/1.1\r\n"
 		"Host: localhost\r\n"
@@ -300,8 +284,7 @@ static void test_authorization_header(void)
 }
 
 /* Test 17: Parse Content-Type header */
-static void test_content_type(void)
-{
+static void test_content_type(void) {
 	const char *raw =
 		"POST /api HTTP/1.1\r\n"
 		"Host: localhost\r\n"
@@ -319,8 +302,7 @@ static void test_content_type(void)
 }
 
 /* Test 18: Parse Connection header */
-static void test_connection_header(void)
-{
+static void test_connection_header(void) {
 	const char *raw =
 		"GET / HTTP/1.1\r\n"
 		"Host: localhost\r\n"
@@ -336,8 +318,7 @@ static void test_connection_header(void)
 }
 
 /* Test 19: Parse Accept-Language header */
-static void test_accept_language(void)
-{
+static void test_accept_language(void) {
 	const char *raw =
 		"GET / HTTP/1.1\r\n"
 		"Host: localhost\r\n"
@@ -353,8 +334,7 @@ static void test_accept_language(void)
 }
 
 /* Test 20: Empty query parameter value */
-static void test_empty_query_value(void)
-{
+static void test_empty_query_value(void) {
 	const char *raw =
 		"GET /search?q=&empty HTTP/1.1\r\n"
 		"Host: localhost\r\n"
@@ -369,8 +349,7 @@ static void test_empty_query_value(void)
 }
 
 /* Test 21: Parse Set-Cookie with Expires */
-static void test_set_cookie_expires(void)
-{
+static void test_set_cookie_expires(void) {
 	const char *raw =
 		"HTTP/1.1 200 OK\r\n"
 		"Set-Cookie: session=abc; Expires=Wed, 21 Oct 2026 07:28:00 GMT\r\n"
@@ -385,8 +364,7 @@ static void test_set_cookie_expires(void)
 }
 
 /* Test 22: Parse Set-Cookie with Domain */
-static void test_set_cookie_domain(void)
-{
+static void test_set_cookie_domain(void) {
 	const char *raw =
 		"HTTP/1.1 200 OK\r\n"
 		"Set-Cookie: user=test; Domain=example.com\r\n"
@@ -401,8 +379,7 @@ static void test_set_cookie_domain(void)
 }
 
 /* Test 23: Parse Set-Cookie with Max-Age */
-static void test_set_cookie_max_age(void)
-{
+static void test_set_cookie_max_age(void) {
 	const char *raw =
 		"HTTP/1.1 200 OK\r\n"
 		"Set-Cookie: token=abc; Max-Age=3600\r\n"
@@ -416,8 +393,7 @@ static void test_set_cookie_max_age(void)
 }
 
 /* Test 24: Parse LF line endings */
-static void test_lf_line_endings(void)
-{
+static void test_lf_line_endings(void) {
 	const char *raw =
 		"GET /index.html HTTP/1.1\n"
 		"Host: localhost\n"
@@ -432,8 +408,7 @@ static void test_lf_line_endings(void)
 }
 
 /* Test 25: Parse PUT method */
-static void test_put_method(void)
-{
+static void test_put_method(void) {
 	const char *raw =
 		"PUT /resource HTTP/1.1\r\n"
 		"Host: localhost\r\n"
@@ -448,8 +423,225 @@ static void test_put_method(void)
 	test_assert(req.body == "Updated content", "put_method: body correct");
 }
 
-int main(void)
-{
+/* Test 26: File upload - extract boundary from Content-Type */
+static void test_upload_boundary_extraction(void) {
+	const char *raw =
+		"POST /upload HTTP/1.1\r\n"
+		"Host: localhost\r\n"
+		"Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryXyZ123\r\n"
+		"\r\n"
+		"------WebKitFormBoundaryXyZ123\r\n"
+		"Content-Disposition: form-data; name=\"file\"; filename=\"test.txt\"\r\n"
+		"\r\n"
+		"data\r\n"
+		"------WebKitFormBoundaryXyZ123--\r\n";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.boundary == "----WebKitFormBoundaryXyZ123",
+		"upload_boundary: boundary extracted correctly");
+}
+
+/* Test 27: File upload - binary file content preserved */
+static void test_upload_binary_content(void) {
+	const char *raw =
+		"POST /upload HTTP/1.1\r\n"
+		"Host: localhost\r\n"
+		"Content-Type: multipart/form-data; boundary=----bound\r\n"
+		"\r\n"
+		"------bound\r\n"
+		"Content-Disposition: form-data; name=\"file\"; filename=\"image.png\"\r\n"
+		"Content-Type: image/png\r\n"
+		"\r\n"
+		"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\r\n"
+		"------bound--\r\n";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.multipartParts.size() == 1, "upload_binary: one part");
+	test_assert(req.multipartParts[0].filename == "image.png", "upload_binary: filename");
+	test_assert(req.multipartParts[0].contentType == "image/png", "upload_binary: content-type");
+	test_assert(req.multipartParts[0].data.size() > 0, "upload_binary: data not empty");
+}
+
+/* Test 28: File upload - multiple files */
+static void test_upload_multiple_files(void) {
+	const char *raw =
+		"POST /upload HTTP/1.1\r\n"
+		"Host: localhost\r\n"
+		"Content-Type: multipart/form-data; boundary=----bound\r\n"
+		"\r\n"
+		"------bound\r\n"
+		"Content-Disposition: form-data; name=\"file1\"; filename=\"doc.pdf\"\r\n"
+		"Content-Type: application/pdf\r\n"
+		"\r\n"
+		"PDF content here\r\n"
+		"------bound\r\n"
+		"Content-Disposition: form-data; name=\"file2\"; filename=\"image.jpg\"\r\n"
+		"Content-Type: image/jpeg\r\n"
+		"\r\n"
+		"JPEG content here\r\n"
+		"------bound--\r\n";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.multipartParts.size() == 2, "upload_multiple: two parts");
+	test_assert(req.multipartParts[0].filename == "doc.pdf", "upload_multiple: first filename");
+	test_assert(req.multipartParts[0].contentType == "application/pdf", "upload_multiple: first type");
+	test_assert(req.multipartParts[0].data == "PDF content here", "upload_multiple: first data");
+	test_assert(req.multipartParts[1].filename == "image.jpg", "upload_multiple: second filename");
+	test_assert(req.multipartParts[1].contentType == "image/jpeg", "upload_multiple: second type");
+	test_assert(req.multipartParts[1].data == "JPEG content here", "upload_multiple: second data");
+}
+
+/* Test 29: File upload - mixed fields and files */
+static void test_upload_mixed_fields(void) {
+	const char *raw =
+		"POST /upload HTTP/1.1\r\n"
+		"Host: localhost\r\n"
+		"Content-Type: multipart/form-data; boundary=----bound\r\n"
+		"\r\n"
+		"------bound\r\n"
+		"Content-Disposition: form-data; name=\"description\"\r\n"
+		"\r\n"
+		"My vacation photo\r\n"
+		"------bound\r\n"
+		"Content-Disposition: form-data; name=\"file\"; filename=\"photo.jpg\"\r\n"
+		"Content-Type: image/jpeg\r\n"
+		"\r\n"
+		"JPEG binary data\r\n"
+		"------bound--\r\n";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.multipartParts.size() == 2, "upload_mixed: two parts");
+	test_assert(req.multipartParts[0].name == "description", "upload_mixed: text field name");
+	test_assert(req.multipartParts[0].filename == "", "upload_mixed: text has no filename");
+	test_assert(req.multipartParts[0].data == "My vacation photo", "upload_mixed: text data");
+	test_assert(req.multipartParts[1].name == "file", "upload_mixed: file field name");
+	test_assert(req.multipartParts[1].filename == "photo.jpg", "upload_mixed: file has filename");
+}
+
+/* Test 30: File upload - large file simulation */
+static void test_upload_large_content(void) {
+	std::string largeData(1024, 'X');  // 1KB of X
+	std::string raw =
+		"POST /upload HTTP/1.1\r\n"
+		"Host: localhost\r\n"
+		"Content-Type: multipart/form-data; boundary=----bound\r\n"
+		"\r\n"
+		"------bound\r\n"
+		"Content-Disposition: form-data; name=\"bigfile\"; filename=\"large.bin\"\r\n"
+		"Content-Type: application/octet-stream\r\n"
+		"\r\n" + largeData + "\r\n"
+		"------bound--\r\n";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.multipartParts[0].data.size() == 1024, "upload_large: data size is 1024");
+	test_assert(req.multipartParts[0].data == largeData, "upload_large: data matches");
+}
+
+/* Test 31: File upload - special characters in filename */
+static void test_upload_special_filename(void) {
+	const char *raw =
+		"POST /upload HTTP/1.1\r\n"
+		"Host: localhost\r\n"
+		"Content-Type: multipart/form-data; boundary=----bound\r\n"
+		"\r\n"
+		"------bound\r\n"
+		"Content-Disposition: form-data; name=\"file\"; filename=\"my file (1).txt\"\r\n"
+		"\r\n"
+		"content\r\n"
+		"------bound--\r\n";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.multipartParts[0].filename == "my file (1).txt",
+		"upload_special_filename: spaces and parens preserved");
+}
+
+/* Test 32: File download request */
+static void test_download_request(void) {
+	const char *raw =
+		"GET /files/report.pdf HTTP/1.1\r\n"
+		"Host: localhost\r\n"
+		"Accept: application/pdf\r\n"
+		"\r\n";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.method == "GET", "download_request: method is GET");
+	test_assert(req.path == "/files/report.pdf", "download_request: path correct");
+	test_assert(req.headers.at("Accept") == "application/pdf", "download_request: accept header");
+}
+
+/* Test 33: Response Content-Disposition header for download */
+static void test_response_content_disposition(void) {
+	Response res;
+	res.status = OK;
+	res.contentType = "application/octet-stream";
+	res.contentLength = "12345";
+	res.contentDisposition = "attachment; filename=\"report.pdf\"";
+
+	char* header = generateHeader(res);
+	std::string headerStr(header);
+	delete[] header;
+
+	test_assert(headerStr.find("Content-Disposition: attachment; filename=\"report.pdf\"") != std::string::npos,
+		"response_disposition: header contains Content-Disposition");
+	test_assert(headerStr.find("Content-Type: application/octet-stream") != std::string::npos,
+		"response_disposition: header contains Content-Type");
+	test_assert(headerStr.find("Content-Length: 12345") != std::string::npos,
+		"response_disposition: header contains Content-Length");
+}
+
+/* Test 34: Response without Content-Disposition */
+static void test_response_no_disposition(void) {
+	Response res;
+	res.status = OK;
+	res.contentType = "text/html";
+	res.contentLength = "100";
+
+	char* header = generateHeader(res);
+	std::string headerStr(header);
+	delete[] header;
+
+	test_assert(headerStr.find("Content-Disposition") == std::string::npos,
+		"response_no_disposition: no Content-Disposition when empty");
+}
+
+/* Test 35: Response inline disposition for preview */
+static void test_response_inline_disposition(void) {
+	Response res;
+	res.status = OK;
+	res.contentType = "application/pdf";
+	res.contentLength = "5000";
+	res.contentDisposition = "inline; filename=\"preview.pdf\"";
+
+	char* header = generateHeader(res);
+	std::string headerStr(header);
+	delete[] header;
+
+	test_assert(headerStr.find("Content-Disposition: inline; filename=\"preview.pdf\"") != std::string::npos,
+		"response_inline: inline disposition works");
+}
+
+int main(void) {
 	std::cout << "=== RequestParser Tests ===" << std::endl;
 	std::cout << std::endl;
 
@@ -478,6 +670,16 @@ int main(void)
 	test_set_cookie_max_age();
 	test_lf_line_endings();
 	test_put_method();
+	test_upload_boundary_extraction();
+	test_upload_binary_content();
+	test_upload_multiple_files();
+	test_upload_mixed_fields();
+	test_upload_large_content();
+	test_upload_special_filename();
+	test_download_request();
+	test_response_content_disposition();
+	test_response_no_disposition();
+	test_response_inline_disposition();
 
 	std::cout << std::endl;
 	std::cout << "=== Results ===" << std::endl;

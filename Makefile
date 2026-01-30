@@ -49,16 +49,6 @@ $(CGI_BIN): $(CGI_SRC)
 $(NAME): $(OBJ)
 	@echo "$(YELLOW)🔧 Linking $(NAME)...$(RESET)"
 	@$(CXX) $(CXXFLAGS) $(OBJ) -o $(NAME)
-	@echo "$(GREEN)✅ Build complete: ./$(NAME)$(RESET)"
-
-$(OBJS_DIR)%.o: $(SRCS_DIR)%.cpp
-	@mkdir -p $(dir $@)
-	@echo "$(CYAN)[Compiling]$(RESET) $<"
-	@$(CXX) $(CXXFLAGS) -c $< -o $@
-
-$(NAME): $(OBJ)
-	@echo "$(YELLOW)🔧 Linking WebServer...$(RESET)"
-	@$(CXX) $(CXXFLAGS) $(OBJ) -o $(NAME)
 	@echo "$(GREEN)Build complete: ./$(NAME)$(RESET)"
 	@echo "$(BLUE)------------------------------------------------------------------------------$(RESET)"
 	@echo "$(BLUE)░██╗░░░░░░░██╗███████╗██████╗░░██████╗███████╗██████╗░██╗░░░██╗███████╗██████╗░$(RESET)"
@@ -70,9 +60,14 @@ $(NAME): $(OBJ)
 	@echo "$(RED)                       🔥 MADE BY: Arseniy & Hakob 🔥         $(RESET)"
 	@echo "$(BLUE)-------------------------------------------------------------------------------$(RESET)"
 
+$(OBJS_DIR)%.o: $(SRCS_DIR)%.cpp
+	@mkdir -p $(dir $@)
+	@echo "$(CYAN)[Compiling]$(RESET) $<"
+	@$(CXX) $(CXXFLAGS) -c $< -o $@
+
 test:
 	@$(CXX) $(CXXFLAGS) tests/test_config_parser.cpp $(SRCS_DIR)parser/ConfigParser.cpp -o test_config_parser
-	@$(CXX) $(CXXFLAGS) tests/test_request_parser.cpp $(SRCS_DIR)parser/RequestParser.cpp -o test_request_parser
+	@$(CXX) $(CXXFLAGS) tests/test_request_parser.cpp $(SRCS_DIR)parser/RequestParser.cpp $(SRCS_DIR)server/header_generator.cpp -o test_request_parser
 	@./test_config_parser ; c=$$? ; echo "" ; ./test_request_parser ; r=$$? ; rm -f test_config_parser test_request_parser ; exit $$((c + r))
 
 clean:

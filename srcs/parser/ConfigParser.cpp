@@ -242,7 +242,7 @@ void ConfigParser::parseLocation(ServerConfig& server) {
 			expect(TOK_SEMICOLON, "Expected ';' after redirectCode");
 		} else if (directive == "redirectUrl") {
 			next();
-			location.redirectUrl = current().value;
+			location.redirectUrl = stripQuotes(current().value);
 			expect(TOK_WORD, "Expected redirect URL");
 			expect(TOK_SEMICOLON, "Expected ';' after redirectUrl");
 		} else if (directive == "uploadDir") {
@@ -285,6 +285,16 @@ void ConfigParser::parseLocation(ServerConfig& server) {
 	}
 	expect(TOK_RBRACE, "Expected '}' at the end of location");
 	server.locations.push_back(location);
+}
+
+std::string ConfigParser::stripQuotes(const std::string& str) {
+	if (str.size() >= 2) {
+		if ((str[0] == '"' && str[str.size() - 1] == '"') ||
+			(str[0] == '\'' && str[str.size() - 1] == '\'')) {
+			return str.substr(1, str.size() - 2);
+		}
+	}
+	return str;
 }
 
 long long ConfigParser::parseSize(const std::string& size) {
