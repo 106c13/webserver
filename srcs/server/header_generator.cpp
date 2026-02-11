@@ -61,6 +61,9 @@ char* generateHeader(const struct Response& res) {
     header += "Content-Type: " + contentType + "\r\n";
     header += "Content-Length: " + res.contentLength + "\r\n";
 
+    if (!res.contentDisposition.empty())
+        header += "Content-Disposition: " + res.contentDisposition + "\r\n";
+
     if (res.cookie) {
         header += "Set-Cookie: ";
         header += res.cookie->value;

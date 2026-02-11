@@ -1,3 +1,7 @@
+#include <sys/epoll.h>
+#include <cerrno>
+
+
 #include <fcntl.h>
 #include <string>
 #include "webserv.h"
@@ -41,17 +45,16 @@ int checkRequest(const Request& request, const LocationConfig& location) {
  * If cgi found, run cgi and send the output from cgi
  * If cgi not found, just read the file
 */
-void Server::handleRequest(HttpRequest& request) {
+void Server::handleRequest(Connection& conn) {
 	std::string path;
 	std::string cgiPath;
 	LocationConfig location;
 	int fd;
 	int status;
 	
-	parser_.parse(request.getContent());
-	request.setRequest(parser_.getRequest());
+	parser_.parse(conn.recvBuffer.data());
 
-	log(request);
+	log(WARNING, "Here");
 	path = request.getPath();
 	location = resolveLocation(path);
 	if (!checkRequest(request.getRequest(), location))
@@ -90,15 +93,156 @@ void Server::handleRequest(HttpRequest& request) {
 }
 
 void Server::acceptConnection() {
-	int			request_fd;
-	sockaddr_in	request_addr;
-	socklen_t	request_len = sizeof(request_addr);
+    sockaddr_in addr;
+    socklen_t len = sizeof(addr);
 
-	request_fd = accept(server_fd_, (sockaddr *)&request_addr, &request_len);
-	if (request_fd < 0) {
-		log(ERROR, "accept() failed");
-		return;
+    while (true) {
+        int clientFd = accept(serverFd_, (sockaddr*)&addr, &len);
+		if (clientFd < 0) {
+    		if (errno == EAGAIN || errno == EWOULDBLOCK)
+        		break;
+    		return;
+		}
+
+        fcntl(clientFd, F_SETFL, O_NONBLOCK);
+
+        epoll_event ev;
+        ev.events = EPOLLIN;
+        ev.data.fd = clientFd;
+
+        epoll_ctl(epollFd_, EPOLL_CTL_ADD, clientFd, &ev);
+
+		Connection& conn = connections_[clientFd];
+		conn.fd = clientFd;
+
+        std::cout << "New connection\n";
+    }
+}
+
+
+void Server::handleClient(epoll_event& event) {
+    int fd = event.data.fd;
+
+	if (event.events & EPOLLIN) {
+        handleRead(connections_[fd]);
+	} else if (event.events & EPOLLOUT) {
+        handleWrite(connections_[fd]);
 	}
-	HttpRequest request(request_fd);
-	handleRequest(request);
+}
+
+bool Server::requestComplete(const Buffer& buf, size_t& endPos)
+{
+    const char* data = buf.data();
+    size_t len = buf.size();
+
+    for (size_t i = 0; i + 3 < len; ++i) {
+        if (data[i] == '\r' &&
+            data[i+1] == '\n' &&
+            data[i+2] == '\r' &&
+            data[i+3] == '\n')
+        {
+            endPos = i + 4; // save the end position
+            return true;
+        }
+    }
+    return false;
+}
+
+void Server::handleRead(Connection& conn) {
+    char buf[4096];
+
+    while (true) {
+        ssize_t n = recv(conn.fd, buf, sizeof(buf), 0);
+
+        if (n > 0) {
+            conn.recvBuffer.append(buf, n);
+        } else if (n == 0) {
+            closeConnection(conn.fd);
+            return;
+        } else {
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+                break;
+            closeConnection(conn.fd);
+            return;
+        }
+    }
+
+	size_t endPos;
+	while (requestComplete(conn.recvBuffer, endPos)) {
+    	std::string raw(conn.recvBuffer.data(), endPos);
+
+		parser_.parse(raw);
+		Request req = parser_.getRequest();
+
+		conn.recvBuffer.consume(endPos);
+
+		handleRequest(conn, req);
+	}
+
+    if (!conn.sendBuffer.empty())
+        modifyToWrite(conn.fd);
+}
+
+void Server::handleWrite(Connection& conn) {
+    while (!conn.sendBuffer.empty()) {
+        ssize_t n = send(conn.fd,
+                         conn.sendBuffer.data(),
+                         conn.sendBuffer.size(),
+                         0);
+
+        if (n > 0) {
+            conn.sendBuffer.consume(n);
+        } else {
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+                return;
+            closeConnection(conn.fd);
+            return;
+        }
+    }
+
+    conn.writable = false;
+    modifyToRead(conn.fd);
+}
+
+void Server::modifyToWrite(int fd) {
+    epoll_event ev;
+    ev.events = EPOLLIN | EPOLLOUT; // keep reading + allow writing
+    ev.data.fd = fd;
+
+    epoll_ctl(epollFd_, EPOLL_CTL_MOD, fd, &ev);
+}
+
+void Server::modifyToRead(int fd) {
+    epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.fd = fd;
+
+    epoll_ctl(epollFd_, EPOLL_CTL_MOD, fd, &ev);
+}
+
+void Server::closeConnection(int fd) {
+    epoll_ctl(epollFd_, EPOLL_CTL_DEL, fd, NULL);
+    close(fd);
+    connections_.erase(fd);
+}
+
+void Server::loop() {
+    epoll_event events[1024];
+
+    while (true) {
+        int evCount = epoll_wait(epollFd_, events, 1024, -1);
+        if (evCount < 0)
+            continue;
+
+        for (int i = 0; i < evCount; i++) {
+            int fd = events[i].data.fd;
+            epoll_event& ev = events[i];
+
+            if (fd == serverFd_) {
+                acceptConnection();
+            } else {
+                handleClient(ev);
+            }
+        }
+    }
 }

@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <sys/socket.h>
+#include <sys/epoll.h>
 #include <netinet/in.h>
 #include <unistd.h>
 #include <exception>
@@ -14,11 +15,20 @@
 #include "RequestParser.h"
 #include "HeaderGenerator.h"
 #include "defines.h"
+#include "Buffer.h"
 
 #define COLOR_GREEN "\033[1;32m"
 #define COLOR_RED   "\033[1;31m"
 #define COLOR_YELLOW "\033[1;33m"
 #define COLOR_RESET "\033[0m"
+
+
+struct Connection {
+	int		fd;
+	Buffer	recvBuffer;
+	Buffer	sendBuffer;
+	bool	writable;
+};
 
 
 struct DirEntry {
@@ -59,6 +69,7 @@ class	HttpRequest {
 		int						sendChunked(const int fd);
 		int						sendFile(const std::string& path);
 };
+
 class	Server {
 	private:
 		// config
@@ -66,10 +77,19 @@ class	Server {
 		RequestParser	parser_;
 
 		// variables
-		int			server_fd_;
+		std::map<int, Connection> connections_;
+		int			serverFd_;
+		int			epollFd_;
 		sockaddr_in	addr_;
 
 		void			initSocket();
+		void			acceptConnection();
+		void			handleClient(epoll_event& event);
+		void			handleRead(Connection& conn);
+		void			handleWrite(Connection& conn);
+		void			modifyToWrite(int fd);
+		void			modifyToRead(int fd);
+		void			closeConnection(int fd);
 		int				runCGI(const char* path, const char* cgiPath, const HttpRequest& request);
 		void			handleRequest(HttpRequest&	request);
 		int				resolvePath(std::string& path, LocationConfig& location);
@@ -83,8 +103,8 @@ class	Server {
 		Server(const ServerConfig& config); // Start server with configurations from file
 		~Server();
 
-		void		acceptConnection();
 		void		sendError(int code, HttpRequest& request) const;
+		void		loop();
 };
 
 void					log(int type, const std::string& msg);

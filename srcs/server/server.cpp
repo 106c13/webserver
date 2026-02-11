@@ -1,4 +1,5 @@
 #include <unistd.h>  
+#include <fcntl.h>
 #include <sys/socket.h>
 #include <iostream>
 #include <exception>
@@ -13,12 +14,12 @@ void Server::initSocket() {
 	std::ostringstream oss;
 
 	log(INFO, "Starting server");
-	server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
-	if (server_fd_ < 0)
+	serverFd_ = socket(AF_INET, SOCK_STREAM, 0);
+	if (serverFd_ < 0)
 		throw std::runtime_error("socket() failed");
 
 	int opt = 1;
-	if (setsockopt(server_fd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
+	if (setsockopt(serverFd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
 		throw std::runtime_error("setsockopt() failed");
 
 	// value-initialize (NO memset)
@@ -27,26 +28,39 @@ void Server::initSocket() {
 	addr_.sin_addr.s_addr = INADDR_ANY;
 	addr_.sin_port = htons(config_.port);
 
-	if (bind(server_fd_, (sockaddr*)&addr_, sizeof(addr_)) < 0) {
+	if (bind(serverFd_, (sockaddr*)&addr_, sizeof(addr_)) < 0) {
 		oss << "bind() failed on port " << config_.port;
 		throw std::runtime_error(oss.str());
 	}
 
-	if (listen(server_fd_, 10) < 0) {
+	if (listen(serverFd_, 10) < 0) {
 		oss << "listen() failed on port " << config_.port;
 		throw std::runtime_error(oss.str());
 	}
+	
+	fcntl(serverFd_, F_SETFL, O_NONBLOCK);
+
 	oss << "Server started on port ";
 	oss << config_.port;
 	log(INFO, oss.str()); 
 }
 
 Server::Server(const ServerConfig& config) {
+	epollFd_ = epoll_create(1024);
 	config_ = config;
+	
 	initSocket();
+	
+	fcntl(serverFd_, F_SETFL, O_NONBLOCK);
+
+    epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.fd = serverFd_;
+
+    epoll_ctl(epollFd_, EPOLL_CTL_ADD, serverFd_, &ev);
 }
 
 Server::~Server() {
-	if (server_fd_ >= 0)
-		close(server_fd_);
+	if (serverFd_ >= 0)
+		close(serverFd_);
 }
