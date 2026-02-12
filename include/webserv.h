@@ -91,7 +91,8 @@ class	Server {
 		void			modifyToRead(int fd);
 		void			closeConnection(int fd);
 		int				runCGI(const char* path, const char* cgiPath, const HttpRequest& request);
-		void			handleRequest(HttpRequest&	request);
+		//void			handleRequest(HttpRequest&	request);
+		void			handleRequest(Connection& conn, Request& req);
 		int				resolvePath(std::string& path, LocationConfig& location);
 		LocationConfig&	resolveLocation(std::string& fs_path);
 		void			generateAutoindex(HttpRequest& request, LocationConfig& location);

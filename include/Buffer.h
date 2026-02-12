@@ -1,6 +1,8 @@
 #ifndef BUFFER_H
 #define BUFFER_H
 
+#include <string>
+
 class Buffer {
 	private:
 		char*	data_;
@@ -22,6 +24,8 @@ class Buffer {
 
 
 		void		append(const char* buf, size_t len);
+		void		append(const char* buf);
+		void		append(const std::string& buf);
 		void		consume(size_t n);
 		void		clear();
 };

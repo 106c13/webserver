@@ -70,6 +70,21 @@ void Buffer::append(const char* buf, size_t len) {
     end_ += len;
 }
 
+void Buffer::append(const char* buf) {
+    if (!buf)
+        return;
+    append(buf, std::strlen(buf));
+}
+
+void Buffer::append(const std::string& buf)
+{
+    if (buf.empty())
+        return;
+    append(buf.data(), buf.size());
+}
+
+
+
 void Buffer::consume(size_t n) {
 	start_ += n;
 	if (start_ == end_) {

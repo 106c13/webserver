@@ -45,6 +45,7 @@ int checkRequest(const Request& request, const LocationConfig& location) {
  * If cgi found, run cgi and send the output from cgi
  * If cgi not found, just read the file
 */
+/*
 void Server::handleRequest(Connection& conn) {
 	std::string path;
 	std::string cgiPath;
@@ -91,6 +92,21 @@ void Server::handleRequest(Connection& conn) {
 			return sendError(SERVER_ERROR, request);
 	}
 }
+*/
+
+void Server::handleRequest(Connection& conn, Request& req) {
+    conn.sendBuffer.append(
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Length: 12\r\n"
+        "Connection: keep-alive\r\n"
+        "Content-Type: text/plain\r\n"
+        "\r\n"
+        "Hello world\n"
+    );
+
+    modifyToWrite(conn.fd);
+}
+
 
 void Server::acceptConnection() {
     sockaddr_in addr;
@@ -130,7 +146,7 @@ void Server::handleClient(epoll_event& event) {
 	}
 }
 
-bool Server::requestComplete(const Buffer& buf, size_t& endPos)
+static bool requestComplete(const Buffer& buf, size_t& endPos)
 {
     const char* data = buf.data();
     size_t len = buf.size();
@@ -189,7 +205,7 @@ void Server::handleWrite(Connection& conn) {
                          conn.sendBuffer.data(),
                          conn.sendBuffer.size(),
                          0);
-
+        log(ERROR, "Sending");
         if (n > 0) {
             conn.sendBuffer.consume(n);
         } else {
