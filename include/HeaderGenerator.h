@@ -9,7 +9,7 @@
 struct Response {
     std::string path;
     std::string version;
-    int status;
+    int         status;
     std::string contentType;
     std::string contentLength;
     std::string connectionType;

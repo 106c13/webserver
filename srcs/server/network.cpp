@@ -28,7 +28,7 @@ int checkRequest(const Request& request, const LocationConfig& location) {
 }
 
 void Server::sendRedirect(Connection& conn, const LocationConfig& location) {
-	Response res;
+	Response& res = conn.res;
 	std::string header;
 
 
@@ -101,18 +101,61 @@ parser_.parse(conn.recvBuffer.data());
 }
 */
 
-void Server::handleRequest(Connection& conn, Request& req) {
+void Server::sendFile(Connection& conn, const std::string& path)
+{
+    if (!fileExists(path))
+        return sendError(NOT_FOUND, conn);
+
+    if (!canReadFile(path))
+        return sendError(FORBIDDEN, conn);
+
+    ssize_t size = getFileSize(path);
+    if (size < 0)
+        return sendError(SERVER_ERROR, conn);
+
+    int fd = open(path.c_str(), O_RDONLY);
+    if (fd < 0)
+        return sendError(SERVER_ERROR, conn);
+
+    /* ---------- prepare response ---------- */
+
+    Response& res = conn.res;
+    res.status = OK;
+    res.path = path;
+    res.contentLength = toString(size);
+    res.connectionType = "close";
+
+    std::string header = generateHeader(res);
+    conn.sendBuffer.append(header);
+
+    /* ---------- read file ---------- */
+
+    char buf[8192];
+    ssize_t n;
+
+    while ((n = read(fd, buf, sizeof(buf))) > 0)
+        conn.sendBuffer.append(buf, n);
+
+    close(fd);
+
+    if (n < 0)
+        return sendError(SERVER_ERROR, conn);
+
+    modifyToWrite(conn.fd);
+}
+
+
+void Server::handleRequest(Connection& conn) {
 	std::string path;
 	std::string cgiPath;
 	LocationConfig location;
-	int fd;
+	Request& req = conn.req;
 	int status;
 
 	log(INFO, req.version + " " + req.method + " " + req.uri);
 
 	path = req.path;
 
-	std::cout << "Path: " << path << std::endl;
 
 	location = resolveLocation(path);
 
@@ -123,11 +166,19 @@ void Server::handleRequest(Connection& conn, Request& req) {
 
 	status = resolvePath(path, location);
 	std::cout << "Status: " << status << std::endl;
+	std::cout << "Path: " << path << std::endl;
 	
-	if (status == 2)
+	if (status == 1) {
+		if (location.autoindex)
+			return generateAutoindex(conn, location);
 		return sendError(NOT_FOUND, conn);
-
-    modifyToWrite(conn.fd);
+	} else if (status == 2) {
+		return sendError(NOT_FOUND, conn);
+	} else if (status == 3) {
+		return sendError(FORBIDDEN, conn);
+	}
+    
+    sendFile(conn, path);
 }
 
 
@@ -211,11 +262,11 @@ void Server::handleRead(Connection& conn) {
     	std::string raw(conn.recvBuffer.data(), endPos);
 
 		parser_.parse(raw);
-		Request req = parser_.getRequest();
+		conn.req = parser_.getRequest();
 
 		conn.recvBuffer.consume(endPos);
 
-		handleRequest(conn, req);
+		handleRequest(conn);
 	}
 
     if (!conn.sendBuffer.empty())
@@ -228,7 +279,6 @@ void Server::handleWrite(Connection& conn) {
                          conn.sendBuffer.data(),
                          conn.sendBuffer.size(),
                          0);
-        log(ERROR, "Sending");
         if (n > 0) {
             conn.sendBuffer.consume(n);
         } else {

@@ -4,8 +4,7 @@
 #include "webserv.h"
 #include "HeaderGenerator.h"
 
-static std::string toString(size_t n)
-{
+std::string toString(size_t n) {
     std::ostringstream ss;
     ss << n;
     return ss.str();
@@ -83,7 +82,8 @@ static const char* generateDefaultPage(int code, size_t* pageSize) {
 
 void Server::sendError(int code, Connection& conn)
 {
-    Response res;
+    Response& res = conn.res;
+
     res.status = code;
     res.contentType = "text/html";
     res.connectionType = "close";
@@ -119,6 +119,7 @@ void Server::sendError(int code, Connection& conn)
             modifyToWrite(conn.fd);
             return;
         }
+		log(WARNING, "Error page " + path + " not found");
     }
 
     /* fallback default page */

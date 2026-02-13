@@ -24,10 +24,15 @@
 
 
 struct Connection {
-	int		fd;
-	Buffer	recvBuffer;
-	Buffer	sendBuffer;
-	bool	writable;
+    int         fd;
+
+    Buffer		recvBuffer;
+    Buffer		sendBuffer;
+
+    Request		req;
+    Response	res;
+
+	bool		writable;	
 };
 
 
@@ -92,13 +97,14 @@ class	Server {
 		void			closeConnection(int fd);
 		int				runCGI(const char* path, const char* cgiPath, const HttpRequest& request);
 		//void			handleRequest(HttpRequest&	request);
-		void			handleRequest(Connection& conn, Request& req);
+		void			handleRequest(Connection& conn);
 		int				resolvePath(std::string& path, LocationConfig& location);
 		LocationConfig&	resolveLocation(std::string& fs_path);
-		void			generateAutoindex(HttpRequest& request, LocationConfig& location);
+		void			generateAutoindex(Connection& conn, LocationConfig& location);
 		void			sendRedirect(Connection& conn, const LocationConfig& location);
 		std::string		findCGI(const std::string& fileName, const std::map<std::string, std::string>& cgiMap);
 		std::string		findErrorPage(int code) const;
+		void			sendFile(Connection& conn, const std::string& path);
 
 	public:
 		Server(const ServerConfig& config); // Start server with configurations from file
@@ -116,4 +122,5 @@ bool					canReadFile(const std::string& path);
 ssize_t					getFileSize(const std::string& path);
 std::string				readFile(const std::string& filename);
 std::vector<DirEntry>	listDirectory(const std::string& path);
+std::string				toString(size_t n);
 #endif

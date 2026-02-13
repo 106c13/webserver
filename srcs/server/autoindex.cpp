@@ -1,11 +1,13 @@
 #include <dirent.h>
 #include "webserv.h"
 
-void Server::generateAutoindex(HttpRequest& request, LocationConfig& location) {
-    std::string path = request.getURI();
+void Server::generateAutoindex(Connection& conn, LocationConfig& location) {
+    Request& req = conn.req;
+    Response& res = conn.res;
+    std::string path = req.uri;
     std::string page;
     std::vector<DirEntry> dirs;
-    const char* header;
+    std::string header;
 
     if (path[path.length() - 1] != '/')
         path += '/';
@@ -27,10 +29,11 @@ void Server::generateAutoindex(HttpRequest& request, LocationConfig& location) {
         page += "<a href=\"" + path + it->name + "\">" + it->name + "</a><br>\n";
     }
     page += "</body></html>";
-    request.setContentLength(page.size());
-    request.setContentType("text/html");
-	header = "123"; //generateHeader(request.getResponse());
-	request.sendAll(header, std::strlen(header));
-    request.sendAll(page);
-    delete[] header;
+    res.contentLength = toString(page.size());
+    res.contentType = "text/html";
+	header = generateHeader(res);
+    conn.sendBuffer.append(header);
+    conn.sendBuffer.append(page);
+    
+    modifyToWrite(conn.fd);
 }
