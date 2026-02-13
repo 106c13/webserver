@@ -104,7 +104,7 @@ class	Server {
 		Server(const ServerConfig& config); // Start server with configurations from file
 		~Server();
 
-		void		sendError(int code, HttpRequest& request) const;
+		void		sendError(int code, Connection& conn);
 		void		loop();
 };
 

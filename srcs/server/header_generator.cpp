@@ -36,7 +36,7 @@ static std::string resolveContentType(const std::string& ext) {
     return "application/octet-stream";
 }
 
-char* generateHeader(const struct Response& res) {
+std::string generateHeader(const struct Response& res) {
     std::string header;
     std::string contentType;
     std::string ext;
@@ -72,10 +72,6 @@ char* generateHeader(const struct Response& res) {
 
     header += "Connection: " + res.connectionType + "\r\n";
     header += "\r\n";
-
-    char* result = new char[header.size() + 1];
-    std::memcpy(result, header.c_str(), header.size());
-    result[header.size()] = '\0';
-
-    return result;
+	
+	return header;
 }

@@ -52,7 +52,7 @@ int HttpRequest::sendFile(const std::string& path) {
     /* ---------- send header ---------- */
     setContentLength(getFileSize(path));
     res_.path = path;
-    char* header = generateHeader(res_);
+    const char* header = "Test"; //generateHeader(res_);
     if (!sendAll(header, std::strlen(header))) {
         delete[] header;
         close(fd);

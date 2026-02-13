@@ -7,15 +7,6 @@
 #include "webserv.h"
 #include "ConfigParser.h"
 
-void Server::sendRedirect(HttpRequest& request, const LocationConfig& location) {
-	char* header;
-
-	request.setStatus(location.redirectCode);
-	request.setLocation(location.redirectUrl);
-	header = generateHeader(request.getResponse());
-	request.sendAll(header);
-	delete[] header;
-}
 
 int checkRequest(const Request& request, const LocationConfig& location) {
 	if (location.methods.empty()) {
@@ -53,7 +44,7 @@ void Server::handleRequest(Connection& conn) {
 	int fd;
 	int status;
 	
-	parser_.parse(conn.recvBuffer.data());
+parser_.parse(conn.recvBuffer.data());
 
 	log(WARNING, "Here");
 	path = request.getPath();
@@ -95,14 +86,30 @@ void Server::handleRequest(Connection& conn) {
 */
 
 void Server::handleRequest(Connection& conn, Request& req) {
-    conn.sendBuffer.append(
-        "HTTP/1.1 200 OK\r\n"
-        "Content-Length: 12\r\n"
-        "Connection: keep-alive\r\n"
-        "Content-Type: text/plain\r\n"
-        "\r\n"
-        "Hello world\n"
-    );
+	std::string path;
+	std::string cgiPath;
+	LocationConfig location;
+	int fd;
+	int status;
+
+	log(INFO, req.version + " " + req.method + " " + req.uri);
+
+	path = req.path;
+
+	std::cout << "Path: " << path << std::endl;
+
+	location = resolveLocation(path);
+
+	if (!checkRequest(req, location))
+		return; //sendError(BAD_REQUEST, request);
+	if (location.redirectCode != 0)
+		return; //sendRedirect(request, location);
+
+	status = resolvePath(path, location);
+	std::cout << "Status: " << status << std::endl;
+	
+	if (status == 2)
+		return sendError(NOT_FOUND, conn);
 
     modifyToWrite(conn.fd);
 }

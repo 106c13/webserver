@@ -1,8 +1,15 @@
 #include <sstream>
-#include <cstring>
+#include <string>
 #include <fcntl.h>
 #include "webserv.h"
 #include "HeaderGenerator.h"
+
+static std::string toString(size_t n)
+{
+    std::ostringstream ss;
+    ss << n;
+    return ss.str();
+}
 
 static const char* generateDefaultPage(int code, size_t* pageSize) {
 	if (code == BAD_REQUEST) {
@@ -74,27 +81,56 @@ static const char* generateDefaultPage(int code, size_t* pageSize) {
 	return "";
 }
 
-void Server::sendError(int code, HttpRequest& request) const {
-	const char* page;
-	const char* header;
-	size_t		pageSize;
-	std::string path;
-	std::map<int, std::string>::const_iterator it = config_.errorPages.find(code);
+void Server::sendError(int code, Connection& conn)
+{
+    Response res;
+    res.status = code;
+    res.contentType = "text/html";
+    res.connectionType = "close";
 
-	request.setStatus(code);
-	if (it != config_.errorPages.end())
-		path = it->second;
+    const char* page;
+    size_t pageSize;
 
-	if (!path.empty()) {
-		if (request.sendFile(path) > 0)
-			return;
-	}
+    std::string path;
+    std::map<int, std::string>::const_iterator it = config_.errorPages.find(code);
 
-	page = generateDefaultPage(code, &pageSize);
-	request.setContentLength(pageSize);
-    request.setContentType("text/html");
-	header = generateHeader(request.getResponse());
-	request.sendAll(header, std::strlen(header));
-	request.sendAll(page, pageSize);
-	delete[] header;
+    if (it != config_.errorPages.end())
+        path = it->second;
+
+    /* try configured error file */
+    if (!path.empty()) {
+        int fd = open(path.c_str(), O_RDONLY);
+        if (fd >= 0) {
+            std::string body;
+            char buf[4096];
+            ssize_t n;
+
+            while ((n = read(fd, buf, sizeof(buf))) > 0)
+                body.append(buf, n);
+
+            close(fd);
+
+            res.contentLength = toString(body.size());
+
+            std::string header = generateHeader(res);
+            conn.sendBuffer.append(header);
+            conn.sendBuffer.append(body);
+
+            modifyToWrite(conn.fd);
+            return;
+        }
+    }
+
+    /* fallback default page */
+    page = generateDefaultPage(code, &pageSize);
+
+    res.contentLength = toString(pageSize);
+
+    std::string header = generateHeader(res);
+
+    conn.sendBuffer.append(header);
+    conn.sendBuffer.append(page, pageSize);
+
+    modifyToWrite(conn.fd);
 }
+

@@ -30,6 +30,6 @@ struct Response {
     {}
 };
 
-char*	generateHeader(const struct Response& res);
+std::string	generateHeader(const struct Response& res);
 
 #endif
