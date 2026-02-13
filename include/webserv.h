@@ -96,7 +96,7 @@ class	Server {
 		int				resolvePath(std::string& path, LocationConfig& location);
 		LocationConfig&	resolveLocation(std::string& fs_path);
 		void			generateAutoindex(HttpRequest& request, LocationConfig& location);
-		void			sendRedirect(HttpRequest& request, const LocationConfig& location);
+		void			sendRedirect(Connection& conn, const LocationConfig& location);
 		std::string		findCGI(const std::string& fileName, const std::map<std::string, std::string>& cgiMap);
 		std::string		findErrorPage(int code) const;
 

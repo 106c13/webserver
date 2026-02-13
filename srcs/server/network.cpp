@@ -27,6 +27,22 @@ int checkRequest(const Request& request, const LocationConfig& location) {
     return 0;
 }
 
+void Server::sendRedirect(Connection& conn, const LocationConfig& location) {
+	Response res;
+	std::string header;
+
+
+	res.status = location.redirectCode;
+	res.location = location.redirectUrl;
+	res.contentLength = "0";
+
+	header = generateHeader(res);
+    conn.sendBuffer.append(header);
+
+	std::cout << conn.sendBuffer.data() << std::endl;
+    modifyToWrite(conn.fd);
+}
+
 /*
  * Parse the resquest
  * Resolve the path
@@ -101,9 +117,9 @@ void Server::handleRequest(Connection& conn, Request& req) {
 	location = resolveLocation(path);
 
 	if (!checkRequest(req, location))
-		return; //sendError(BAD_REQUEST, request);
+		return sendError(BAD_REQUEST, conn);
 	if (location.redirectCode != 0)
-		return; //sendRedirect(request, location);
+		return sendRedirect(conn, location);
 
 	status = resolvePath(path, location);
 	std::cout << "Status: " << status << std::endl;
