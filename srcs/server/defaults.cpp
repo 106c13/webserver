@@ -97,7 +97,12 @@ void Server::sendError(int code, Connection& conn)
     if (it != config_.errorPages.end())
         path = it->second;
 
+	conn.sendBuffer.clear();
+
     if (!path.empty()) {
+		if (path[0] != '/')
+			path = config_.root + '/' + path;
+
         int fd = open(path.c_str(), O_RDONLY);
         if (fd >= 0) {
             std::string body;

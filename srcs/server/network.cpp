@@ -1,7 +1,5 @@
 #include <sys/epoll.h>
 #include <cerrno>
-
-
 #include <fcntl.h>
 #include <string>
 #include "webserv.h"
@@ -19,8 +17,7 @@ int checkRequest(const Request& request, const LocationConfig& location) {
 
     for (std::vector<std::string>::const_iterator it = location.methods.begin();
          it != location.methods.end();
-         ++it)
-    {
+         ++it) {
         if (*it == request.method)
             return 1;
     }
