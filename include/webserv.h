@@ -31,6 +31,7 @@ struct Connection {
 
 
 struct DirEntry {
+	int			type;
 	std::string name;
 	int			size;
 	bool		is_dir;

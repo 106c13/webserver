@@ -60,6 +60,23 @@ std::string readFile(const std::string& filename) {
 	return content;
 }
 
+static int detectType(const std::string& name, bool is_dir)
+{
+    if (is_dir)
+        return 1; // folder
+
+    size_t dot = name.rfind('.');
+    if (dot == std::string::npos)
+        return 3; // other
+
+    std::string ext = name.substr(dot + 1);
+
+    if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "gif")
+        return 2; // image
+
+    return 3; // other
+}
+
 std::vector<DirEntry> listDirectory(const std::string& path) {
     std::vector<DirEntry> entries;
 	DirEntry d;
@@ -68,26 +85,26 @@ std::vector<DirEntry> listDirectory(const std::string& path) {
         return entries;
 
     struct dirent* ent;
-    while ((ent = readdir(dir)) != NULL) {
-        d.name = ent->d_name;
+	while ((ent = readdir(dir)) != NULL) {
+		d.name = ent->d_name;
 
-        if (d.name == ".")
-            continue;
+		if (d.name == ".")
+			continue;
 
-        d.is_dir = false;
+		std::string full = path + "/" + d.name;
 
-        if (ent->d_type == DT_DIR) {
-            d.is_dir = true;
-        } else if (ent->d_type == DT_UNKNOWN) {
-            // fallback to stat
-            struct stat st;
-            std::string full = path + "/" + d.name;
-            if (stat(full.c_str(), &st) == 0)
-                d.is_dir = S_ISDIR(st.st_mode);
-        }
+		struct stat st;
+		if (stat(full.c_str(), &st) == 0) {
+			d.is_dir = S_ISDIR(st.st_mode);
+			d.size   = st.st_size;
+		} else {
+			d.is_dir = false;
+			d.size   = 0;
+		}
+		d.type = detectType(full, d.is_dir);
 
-        entries.push_back(d);
-    }
+		entries.push_back(d);
+	}
     closedir(dir);
     return entries;
 }
