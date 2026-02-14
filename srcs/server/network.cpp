@@ -117,7 +117,7 @@ void Server::sendFile(Connection& conn, const std::string& path)
     if (fd < 0)
         return sendError(SERVER_ERROR, conn);
 
-    /* ---------- prepare response ---------- */
+    /* ---------- prepare header ---------- */
 
     Response& res = conn.res;
     res.status = OK;

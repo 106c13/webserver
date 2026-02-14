@@ -17,12 +17,6 @@
 #include "defines.h"
 #include "Buffer.h"
 
-#define COLOR_GREEN "\033[1;32m"
-#define COLOR_RED   "\033[1;31m"
-#define COLOR_YELLOW "\033[1;33m"
-#define COLOR_RESET "\033[0m"
-
-
 struct Connection {
     int         fd;
 
@@ -38,41 +32,8 @@ struct Connection {
 
 struct DirEntry {
 	std::string name;
+	int			size;
 	bool		is_dir;
-};
-
-class	HttpRequest {
-	private:
-		// I don't know
-		int			request_fd_;
-		std::string content_;
-		Request		req_;
-		Response	res_;
-	public:
-		HttpRequest(int	fd);
-		~HttpRequest();
-
-		// Request
-		void					setRequest(const Request& request);
-		void					setPath(const std::string& file);
-		const struct Request&	getRequest();
-		const std::string&		getPath() const;
-		const std::string&		getMethod() const;
-		const std::string&		getURI() const;
-		// Response
-		void					setStatus(int code);
-		void					setContentType(const std::string& s);
-		void					setContentLength(size_t len);
-		void					setConnectionType(const std::string& s);
-		void					setLocation(const std::string& s);
-		const struct Response&	getResponse();
-
-		const std::string&		getContent();
-
-		int						sendAll(const std::string& response);
-		int						sendAll(const char* buf, size_t len);
-		int						sendChunked(const int fd);
-		int						sendFile(const std::string& path);
 };
 
 class	Server {
@@ -82,10 +43,10 @@ class	Server {
 		RequestParser	parser_;
 
 		// variables
-		std::map<int, Connection> connections_;
-		int			serverFd_;
-		int			epollFd_;
-		sockaddr_in	addr_;
+		std::map<int, Connection>	connections_;
+		int							serverFd_;
+		int							epollFd_;
+		sockaddr_in					addr_;
 
 		void			initSocket();
 		void			acceptConnection();
@@ -95,27 +56,24 @@ class	Server {
 		void			modifyToWrite(int fd);
 		void			modifyToRead(int fd);
 		void			closeConnection(int fd);
-		int				runCGI(const char* path, const char* cgiPath, const HttpRequest& request);
-		//void			handleRequest(HttpRequest&	request);
+		int				runCGI(const char* path, const char* cgiPath, Connection& conn);
 		void			handleRequest(Connection& conn);
 		int				resolvePath(std::string& path, LocationConfig& location);
 		LocationConfig&	resolveLocation(std::string& fs_path);
 		void			generateAutoindex(Connection& conn, LocationConfig& location);
 		void			sendRedirect(Connection& conn, const LocationConfig& location);
-		std::string		findCGI(const std::string& fileName, const std::map<std::string, std::string>& cgiMap);
-		std::string		findErrorPage(int code) const;
+		std::string		findCGI(const std::string& fileName, const StringMap& cgiMap);
 		void			sendFile(Connection& conn, const std::string& path);
+		void			sendError(int code, Connection& conn);
 
 	public:
 		Server(const ServerConfig& config); // Start server with configurations from file
 		~Server();
 
-		void		sendError(int code, Connection& conn);
 		void		loop();
 };
 
 void					log(int type, const std::string& msg);
-void					log(const HttpRequest& request);
 
 bool					fileExists(const std::string& path);
 bool					canReadFile(const std::string& path);

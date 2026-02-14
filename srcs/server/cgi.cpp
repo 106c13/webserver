@@ -46,7 +46,7 @@ int Server::runCGI(const char* path, const char* cgiPath, const HttpRequest& req
     return pipefd[0];
 }
 
-std::string Server::findCGI(const std::string& fileName, const std::map<std::string, std::string>& cgiMap) {
+std::string Server::findCGI(const std::string& fileName, const StringMap& cgiMap) {
 	std::string extension;
 
 	for (int i = fileName.size() - 1; i >= 0; i--) {
@@ -55,10 +55,14 @@ std::string Server::findCGI(const std::string& fileName, const std::map<std::str
 			break;
 		}
 	}
+
 	if (extension.empty())
         return "";
+
 	std::map<std::string, std::string>::const_iterator it = cgiMap.find(extension);
+
 	if (it == cgiMap.end())
 		return "";
+
 	return it->second;
 }

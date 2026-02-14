@@ -89,11 +89,12 @@ LocationConfig& Server::resolveLocation(std::string& fs_path) {
         }
     }
 
-    // Fallback (should always exist)
-    if (!best)
-        best = &config_.locations[0];
+    if (!best) {
+		if (config_.locations.empty())
+			throw std::runtime_error("No locations configured");
+		best = &config_.locations.front();
+	}
 
-    // Build filesystem path
     fs_path = best->root + "/" + fs_path.substr(best_len);
 
     return *best;

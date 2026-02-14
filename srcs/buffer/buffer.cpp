@@ -76,8 +76,7 @@ void Buffer::append(const char* buf) {
     append(buf, std::strlen(buf));
 }
 
-void Buffer::append(const std::string& buf)
-{
+void Buffer::append(const std::string& buf) {
     if (buf.empty())
         return;
     append(buf.data(), buf.size());

@@ -8,7 +8,6 @@ int main(int argc, char **argv) {
 		return 1;
     }
 
-
     try {
 		ConfigParser parser;
 		parser.parse(argv[1]);

@@ -97,7 +97,6 @@ void Server::sendError(int code, Connection& conn)
     if (it != config_.errorPages.end())
         path = it->second;
 
-    /* try configured error file */
     if (!path.empty()) {
         int fd = open(path.c_str(), O_RDONLY);
         if (fd >= 0) {
@@ -122,7 +121,6 @@ void Server::sendError(int code, Connection& conn)
 		log(WARNING, "Error page " + path + " not found");
     }
 
-    /* fallback default page */
     page = generateDefaultPage(code, &pageSize);
 
     res.contentLength = toString(pageSize);
