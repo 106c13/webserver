@@ -58,6 +58,7 @@ class	Server {
 		void			modifyToRead(int fd);
 		void			closeConnection(int fd);
 		int				runCGI(const char* path, const char* cgiPath, Connection& conn);
+		void			sendCGIOutput(Connection& conn, int cgiFd);
 		void			handleRequest(Connection& conn);
 		int				resolvePath(std::string& path, LocationConfig& location);
 		LocationConfig&	resolveLocation(std::string& fs_path);

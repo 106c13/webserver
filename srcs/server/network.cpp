@@ -143,25 +143,21 @@ void Server::sendFile(Connection& conn, const std::string& path)
 
 
 void Server::handleRequest(Connection& conn) {
-	std::string path;
-	std::string cgiPath;
-	LocationConfig location;
 	Request& req = conn.req;
-	int status;
 
 	log(INFO, req.version + " " + req.method + " " + req.uri);
 
-	path = req.path;
+    std::string path = req.path;
 
 
-	location = resolveLocation(path);
+	LocationConfig location = resolveLocation(path);
 
 	if (!checkRequest(req, location))
 		return sendError(BAD_REQUEST, conn);
 	if (location.redirectCode != 0)
 		return sendRedirect(conn, location);
 
-	status = resolvePath(path, location);
+	int status = resolvePath(path, location);
 	std::cout << "Status: " << status << std::endl;
 	std::cout << "Path: " << path << std::endl;
 	
@@ -175,7 +171,17 @@ void Server::handleRequest(Connection& conn) {
 		return sendError(FORBIDDEN, conn);
 	}
     
-    sendFile(conn, path);
+    std::string cgiPath = findCGI(path, location.cgi);
+	
+	if (!cgiPath.empty()) {
+        conn.req.path = path;
+		int fd = runCGI(path.c_str(), cgiPath.c_str(), conn);
+		if (fd < 0)
+			return sendError(SERVER_ERROR, conn);
+        return sendCGIOutput(conn, fd);
+	} else {
+        sendFile(conn, path);
+	}
 }
 
 
@@ -315,7 +321,8 @@ void Server::closeConnection(int fd) {
 void Server::loop() {
     epoll_event events[1024];
 
-    while (true) {
+    int x = 0;
+    while (x++ < 10) {
         int evCount = epoll_wait(epollFd_, events, 1024, -1);
         if (evCount < 0)
             continue;
