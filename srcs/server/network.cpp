@@ -98,14 +98,13 @@ parser_.parse(conn.recvBuffer.data());
 }
 */
 
-void Server::sendFile(Connection& conn, const std::string& path)
-{
-    if (!fileExists(path))
-        return sendError(NOT_FOUND, conn);
+void Server::sendChunk(Connection& conn, int fd) {
+	// read N bytes from file
+	// write them to the sendBuffer
+	// if file finished, close fd
+}
 
-    if (!canReadFile(path))
-        return sendError(FORBIDDEN, conn);
-
+void Server::sendFile(Connection& conn, const std::string& path) {
     ssize_t size = getFileSize(path);
     if (size < 0)
         return sendError(SERVER_ERROR, conn);
@@ -114,18 +113,20 @@ void Server::sendFile(Connection& conn, const std::string& path)
     if (fd < 0)
         return sendError(SERVER_ERROR, conn);
 
-    /* ---------- prepare header ---------- */
-
     Response& res = conn.res;
     res.status = OK;
     res.path = path;
-    res.contentLength = toString(size);
-    res.connectionType = "close";
+
+	if (size > 1000000) { // 1MB
+		res.connectionTye = "chunked";
+		// Sending file chunked
+	} else {
+    	res.contentLength = toString(size);
+    	res.connectionType = "close";
+	}
 
     std::string header = generateHeader(res);
     conn.sendBuffer.append(header);
-
-    /* ---------- read file ---------- */
 
     char buf[8192];
     ssize_t n;
@@ -140,7 +141,6 @@ void Server::sendFile(Connection& conn, const std::string& path)
 
     modifyToWrite(conn.fd);
 }
-
 
 void Server::handleRequest(Connection& conn) {
 	Request& req = conn.req;
@@ -294,6 +294,8 @@ void Server::handleWrite(Connection& conn) {
         }
     }
 
+	// For chunked sending
+	// if the is opened fd read the file
     conn.writable = false;
     modifyToRead(conn.fd);
 }
