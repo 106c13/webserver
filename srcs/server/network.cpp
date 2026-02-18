@@ -207,6 +207,8 @@ void Server::acceptConnection() {
 
 		Connection& conn = connections_[clientFd];
 		conn.fd = clientFd;
+        conn.fileFd = -1;
+        conn.sendingFile = false;
 
         std::cout << "New connection\n";
     }
@@ -321,8 +323,7 @@ void Server::closeConnection(int fd) {
 void Server::loop() {
     epoll_event events[1024];
 
-    int x = 0;
-    while (x++ < 10) {
+    while (true) {
         int evCount = epoll_wait(epollFd_, events, 1024, -1);
         if (evCount < 0)
             continue;

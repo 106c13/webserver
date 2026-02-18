@@ -27,6 +27,9 @@ struct Connection {
     Response	res;
 
 	bool		writable;	
+
+	int			fileFd;
+	bool		sendingFile;
 };
 
 
