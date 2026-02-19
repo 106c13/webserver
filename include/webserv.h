@@ -68,7 +68,8 @@ class	Server {
 		void			generateAutoindex(Connection& conn, LocationConfig& location);
 		void			sendRedirect(Connection& conn, const LocationConfig& location);
 		std::string		findCGI(const std::string& fileName, const StringMap& cgiMap);
-		void			sendFile(Connection& conn, const std::string& path);
+		bool			prepareFileResponse(Connection& conn, const std::string& path);
+		bool			streamFileChunk(Connection& conn);
 		void			sendError(int code, Connection& conn);
 
 	public:

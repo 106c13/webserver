@@ -43,7 +43,6 @@ struct ServerConfig {
 	long long					clientMaxBodySize;
 	std::map<int, std::string>	errorPages;
 	std::vector<LocationConfig>	locations;
-
 	ServerConfig();
 };
 

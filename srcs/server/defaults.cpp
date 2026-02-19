@@ -75,7 +75,23 @@ static const char* generateDefaultPage(int code, size_t* pageSize) {
 	<p>WebServ 42</p>\n\
 </body>\n\
 </html>";
-	}
+	} else if (code == SERVICE_UNAVAILABLE) {
+		*pageSize = 307;
+		return 
+"<!DOCTYPE html>\n"
+"<html>\n"
+"<head>\n"
+"    <meta charset=\"UTF-8\">\n"
+"    <title>503 Service Unavailable</title>\n"
+"</head>\n"
+"<body>\n"
+"    <h1>503 Service Unavailable</h1>\n"
+"    <p>The server is currently unable to handle the request due to temporary overloading or maintenance.</p>\n"
+"    <hr>\n"
+"    <p>WebServ 42</p>\n"
+"</body>\n"
+"</html>";
+	} 
 	log(ERROR, "Unkown error code");
 	return "";
 }
@@ -127,7 +143,7 @@ void Server::sendError(int code, Connection& conn)
     }
 
     page = generateDefaultPage(code, &pageSize);
-
+	
     res.contentLength = toString(pageSize);
 
     std::string header = generateHeader(res);
