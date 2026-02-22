@@ -110,14 +110,16 @@ void Server::sendError(int code, Connection& conn)
     std::string path;
     std::map<int, std::string>::const_iterator it = config_.errorPages.find(code);
 
-    if (it != config_.errorPages.end())
+    if (it != config_.errorPages.end()) {
         path = it->second;
+	}
 
 	conn.sendBuffer.clear();
 
     if (!path.empty()) {
-		if (path[0] != '/')
+		if (path[0] != '/') {
 			path = config_.root + '/' + path;
+		}
 
         int fd = open(path.c_str(), O_RDONLY);
         if (fd >= 0) {

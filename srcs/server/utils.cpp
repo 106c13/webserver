@@ -37,8 +37,10 @@ ssize_t getFileSize(const std::string& path)
 {
 	struct stat st;
 
-	if (stat(path.c_str(), &st) < 0)
+	if (stat(path.c_str(), &st) < 0) {
 		return -1;
+	}
+
 	return st.st_size;
 }
 
@@ -49,8 +51,10 @@ std::string readFile(const std::string& filename) {
 	std::string content;
 
 	fd = open(filename.c_str(), O_RDONLY);
-	if (fd < 0)
-		return ""; // caller decides what to do (403 / 404)
+
+	if (fd < 0) {
+		return "";
+	}
 
 	while ((bytes = read(fd, buffer, sizeof(buffer))) > 0) {
 		content.append(buffer, bytes);
@@ -62,27 +66,31 @@ std::string readFile(const std::string& filename) {
 
 static int detectType(const std::string& name, bool is_dir)
 {
-    if (is_dir)
-        return 1; // folder
+    if (is_dir) {
+        return 1;
+	}
 
     size_t dot = name.rfind('.');
-    if (dot == std::string::npos)
-        return 3; // other
+    if (dot == std::string::npos) {
+        return 3;
+	}
 
     std::string ext = name.substr(dot + 1);
 
-    if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "gif")
-        return 2; // image
+    if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "gif") {
+        return 2;
+	}
 
-    return 3; // other
+    return 3;
 }
 
 std::vector<DirEntry> listDirectory(const std::string& path) {
     std::vector<DirEntry> entries;
 	DirEntry d;
     DIR* dir = opendir(path.c_str());
-    if (!dir)
+    if (!dir) {
         return entries;
+	}
 
     struct dirent* ent;
 	while ((ent = readdir(dir)) != NULL) {
@@ -105,6 +113,7 @@ std::vector<DirEntry> listDirectory(const std::string& path) {
 
 		entries.push_back(d);
 	}
+
     closedir(dir);
     return entries;
 }

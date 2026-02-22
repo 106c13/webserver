@@ -10,16 +10,19 @@ int checkRequest(const Request& request, const LocationConfig& location) {
 	if (location.methods.empty()) {
 		if (request.method == "GET" ||
 			request.method == "POST" ||
-			request.method == "DELETE")
+            request.method == "DELETE")
+        {
 			return 1;
+        }
         return 0;
 	}
 
     for (std::vector<std::string>::const_iterator it = location.methods.begin();
          it != location.methods.end();
          ++it) {
-        if (*it == request.method)
+        if (*it == request.method) {
             return 1;
+        }
     }
     return 0;
 }
@@ -100,12 +103,14 @@ parser_.parse(conn.recvBuffer.data());
 
 bool Server::prepareFileResponse(Connection& conn, const std::string& path) {
     ssize_t size = getFileSize(path);
-    if (size < 0)
+    if (size < 0) {
         return false;
+    }
 
     int fd = open(path.c_str(), O_RDONLY);
-    if (fd < 0)
+    if (fd < 0) {
         return false;
+    }
 
     Response& res = conn.res;
     res.status = OK;
@@ -150,18 +155,20 @@ void Server::handleRequest(Connection& conn) {
 
 	LocationConfig location = resolveLocation(path);
 
-	if (!checkRequest(req, location))
+	if (!checkRequest(req, location)) {
 		return sendError(BAD_REQUEST, conn);
-	if (location.redirectCode != 0)
+    } else if (location.redirectCode != 0) {
 		return sendRedirect(conn, location);
+    }
 
 	int status = resolvePath(path, location);
 	std::cout << "Status: " << status << std::endl;
 	std::cout << "Path: " << path << std::endl;
 	
 	if (status == 1) {
-		if (location.autoindex)
+		if (location.autoindex) {
 			return generateAutoindex(conn, location);
+        }
 		return sendError(NOT_FOUND, conn);
 	} else if (status == 2) {
 		return sendError(NOT_FOUND, conn);
@@ -174,8 +181,9 @@ void Server::handleRequest(Connection& conn) {
 	if (!cgiPath.empty()) {
         conn.req.path = path;
 		int fd = runCGI(path.c_str(), cgiPath.c_str(), conn);
-		if (fd < 0)
+		if (fd < 0) {
 			return sendError(SERVER_ERROR, conn);
+        }
         return sendCGIOutput(conn, fd);
 	} else {
         if (!prepareFileResponse(conn, path))
@@ -192,8 +200,6 @@ void Server::acceptConnection() {
     while (true) {
         int clientFd = accept(serverFd_, (sockaddr*)&addr, &len);
 		if (clientFd < 0) {
-    		if (errno == EAGAIN || errno == EWOULDBLOCK)
-        		break;
     		return;
 		}
 
@@ -209,10 +215,6 @@ void Server::acceptConnection() {
 		conn.fd = clientFd;
         conn.fileFd = -1;
         conn.sendingFile = false;
-
-        //if (connections_.size() >= config_.maxClients) {
-        //    sendError(SERVICE_UNAVAILABLE, conn);
-        //}
 
         std::cout << "New connection\n";
     }
@@ -278,8 +280,9 @@ void Server::handleRead(Connection& conn) {
 		handleRequest(conn);
 	}
 
-    if (!conn.sendBuffer.empty())
+    if (!conn.sendBuffer.empty()) {
         modifyToWrite(conn.fd);
+    }
 }
 
 void Server::handleWrite(Connection& conn) {
@@ -298,11 +301,13 @@ void Server::handleWrite(Connection& conn) {
         }
     }
     
-    if (conn.sendingFile)
+    if (conn.sendingFile) {
         streamFileChunk(conn);
+    }
 
-    if (conn.sendBuffer.empty())
+    if (conn.sendBuffer.empty()) {
         modifyToRead(conn.fd);
+    }
 }
 
 void Server::modifyToWrite(int fd) {

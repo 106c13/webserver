@@ -15,12 +15,15 @@ void Server::initSocket() {
 
 	log(INFO, "Starting server");
 	serverFd_ = socket(AF_INET, SOCK_STREAM, 0);
-	if (serverFd_ < 0)
+
+	if (serverFd_ < 0) {
 		throw std::runtime_error("socket() failed");
+	}
 
 	int opt = 1;
-	if (setsockopt(serverFd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
+	if (setsockopt(serverFd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
 		throw std::runtime_error("setsockopt() failed");
+	}
 
 	// value-initialize (NO memset)
 	addr_ = sockaddr_in();
@@ -61,6 +64,7 @@ Server::Server(const ServerConfig& config) {
 }
 
 Server::~Server() {
-	if (serverFd_ >= 0)
+	if (serverFd_ >= 0) {
 		close(serverFd_);
+	}
 }

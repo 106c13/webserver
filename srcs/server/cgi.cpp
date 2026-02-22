@@ -78,12 +78,14 @@ int Server::runCGI(const char* path, const char* cgiPath, Connection& conn) {
 		log(ERROR, "PIPE ERROR");
 		return -1;
 	}
+
 	pid = fork();
 	if (pid < 0) {
 		log(ERROR, "FORK ERROR");
 		return -1;
 	} else if (pid == 0) {
 		close(pipefd[0]);
+
 		env = createEviroment(conn.req);
 		dup2(pipefd[1], STDOUT_FILENO);
 		dup2(pipefd[1], STDERR_FILENO);
@@ -96,6 +98,7 @@ int Server::runCGI(const char* path, const char* cgiPath, Connection& conn) {
 		execve(cgiPath, argv, env);
 		_exit(1);
 	}
+
 	close(pipefd[1]);
     return pipefd[0];
 }
@@ -115,8 +118,9 @@ std::string Server::findCGI(const std::string& fileName, const StringMap& cgiMap
 
 	std::map<std::string, std::string>::const_iterator it = cgiMap.find(extension);
 
-	if (it == cgiMap.end())
+	if (it == cgiMap.end()) {
 		return "";
+    }
 
 	return it->second;
 }

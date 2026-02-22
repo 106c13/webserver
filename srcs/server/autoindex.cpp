@@ -28,8 +28,9 @@ void Server::generateAutoindex(Connection& conn, LocationConfig& location)
     Response& res = conn.res;
 
     std::string path = req.uri;
-    if (!path.empty() && path[path.length() - 1] != '/')
+    if (!path.empty() && path[path.length() - 1] != '/') {
         path += '/';
+    }
 
     std::vector<DirEntry> dirs = listDirectory(location.root + path);
 
