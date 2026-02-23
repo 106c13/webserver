@@ -27,8 +27,9 @@ int Server::resolvePath(std::string& path, LocationConfig& location) {
     }
 
     if (S_ISDIR(st.st_mode)) {
-        if (access(path.c_str(), R_OK | X_OK) != 0)
+        if (access(path.c_str(), R_OK | X_OK) != 0) {
             return 3;
+        }
 
         for (std::vector<std::string>::iterator it = location.index.begin();
              it != location.index.end();
@@ -45,11 +46,13 @@ int Server::resolvePath(std::string& path, LocationConfig& location) {
                 return 3;
             }
 
-            if (!S_ISREG(st.st_mode))
+            if (!S_ISREG(st.st_mode)) {
                 continue;
+            }
 
-            if (access(tmp.c_str(), R_OK) != 0)
+            if (access(tmp.c_str(), R_OK) != 0) {
                 return 3;
+            }
 
             path = tmp;
             return 0;
@@ -57,10 +60,14 @@ int Server::resolvePath(std::string& path, LocationConfig& location) {
         return 1;
     }
 
-    if (!S_ISREG(st.st_mode))
+    if (!S_ISREG(st.st_mode)) {
         return 2;
-    if (access(path.c_str(), R_OK) != 0)
+    }
+
+    if (access(path.c_str(), R_OK) != 0) {
         return 3;
+    }
+
     return 0;
 }
 
@@ -89,11 +96,13 @@ LocationConfig& Server::resolveLocation(std::string& fs_path) {
         }
     }
 
-    // Fallback (should always exist)
-    if (!best)
-        best = &config_.locations[0];
+    if (!best) {
+		if (config_.locations.empty()) {
+			throw std::runtime_error("No locations configured");
+        }
+		best = &config_.locations.front();
+	}
 
-    // Build filesystem path
     fs_path = best->root + "/" + fs_path.substr(best_len);
 
     return *best;

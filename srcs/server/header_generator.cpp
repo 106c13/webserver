@@ -21,22 +21,23 @@ static std::string getStatus(int code) {
 }
 
 static std::string resolveContentType(const std::string& ext) {
-    if (ext == "css")
+    if (ext == "css") {
         return "text/css";
-    if (ext == "js")
+    } else if (ext == "js") {
         return "text/javascript";
-    if (ext == "png")
+    } else if (ext == "png") {
         return "image/png";
-    if (ext == "jpg" || ext == "jpeg")
+    } else if (ext == "jpg" || ext == "jpeg") {
         return "image/jpeg";
-    if (ext == "gif")
+    } else if (ext == "gif") {
         return "image/gif";
-    if (ext == "html")
+    } else if (ext == "html") {
         return "text/html";
+    }
     return "application/octet-stream";
 }
 
-char* generateHeader(const struct Response& res) {
+std::string generateHeader(const struct Response& res) {
     std::string header;
     std::string contentType;
     std::string ext;
@@ -55,14 +56,16 @@ char* generateHeader(const struct Response& res) {
         contentType = resolveContentType(ext);
     }
 
-    if (!res.location.empty())
+    if (!res.location.empty()) {
         header += "Location: " + res.location + "\r\n";
+    }
 
     header += "Content-Type: " + contentType + "\r\n";
     header += "Content-Length: " + res.contentLength + "\r\n";
 
-    if (!res.contentDisposition.empty())
+    if (!res.contentDisposition.empty()) {
         header += "Content-Disposition: " + res.contentDisposition + "\r\n";
+    }
 
     if (res.cookie) {
         header += "Set-Cookie: ";
@@ -72,10 +75,6 @@ char* generateHeader(const struct Response& res) {
 
     header += "Connection: " + res.connectionType + "\r\n";
     header += "\r\n";
-
-    char* result = new char[header.size() + 1];
-    std::memcpy(result, header.c_str(), header.size());
-    result[header.size()] = '\0';
-
-    return result;
+	
+	return header;
 }

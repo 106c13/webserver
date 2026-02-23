@@ -15,19 +15,20 @@ SRC_MAIN   = main.cpp
 SRC_SERVER = server.cpp network.cpp utils.cpp \
              defaults.cpp path_resolver.cpp \
 			 autoindex.cpp cgi.cpp header_generator.cpp
-SRC_REQUEST = request.cpp network.cpp
 SRC_PARSER = ConfigParser.cpp RequestParser.cpp
+SRC_BUFFER = buffer.cpp
 
 SRC = \
     $(addprefix $(SRCS_DIR)main/, $(SRC_MAIN)) \
     $(addprefix $(SRCS_DIR)server/, $(SRC_SERVER)) \
     $(addprefix $(SRCS_DIR)request/, $(SRC_REQUEST)) \
-    $(addprefix $(SRCS_DIR)parser/, $(SRC_PARSER))
+    $(addprefix $(SRCS_DIR)parser/, $(SRC_PARSER)) \
+    $(addprefix $(SRCS_DIR)buffer/, $(SRC_BUFFER))
 
 OBJ = $(patsubst $(SRCS_DIR)%.cpp, $(OBJS_DIR)%.o, $(SRC))
 
 CXX = c++
-CXXFLAGS = -Wall -Wextra -Werror -std=c++98 -I $(INCLUDES)
+CXXFLAGS =  -std=c++98 -I $(INCLUDES)
 
 
 GREEN = \033[1;32m

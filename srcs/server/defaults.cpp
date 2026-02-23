@@ -1,8 +1,14 @@
 #include <sstream>
-#include <cstring>
+#include <string>
 #include <fcntl.h>
 #include "webserv.h"
 #include "HeaderGenerator.h"
+
+std::string toString(size_t n) {
+    std::ostringstream ss;
+    ss << n;
+    return ss.str();
+}
 
 static const char* generateDefaultPage(int code, size_t* pageSize) {
 	if (code == BAD_REQUEST) {
@@ -69,32 +75,84 @@ static const char* generateDefaultPage(int code, size_t* pageSize) {
 	<p>WebServ 42</p>\n\
 </body>\n\
 </html>";
-	}
+	} else if (code == SERVICE_UNAVAILABLE) {
+		*pageSize = 307;
+		return 
+"<!DOCTYPE html>\n"
+"<html>\n"
+"<head>\n"
+"    <meta charset=\"UTF-8\">\n"
+"    <title>503 Service Unavailable</title>\n"
+"</head>\n"
+"<body>\n"
+"    <h1>503 Service Unavailable</h1>\n"
+"    <p>The server is currently unable to handle the request due to temporary overloading or maintenance.</p>\n"
+"    <hr>\n"
+"    <p>WebServ 42</p>\n"
+"</body>\n"
+"</html>";
+	} 
 	log(ERROR, "Unkown error code");
 	return "";
 }
 
-void Server::sendError(int code, HttpRequest& request) const {
-	const char* page;
-	const char* header;
-	size_t		pageSize;
-	std::string path;
-	std::map<int, std::string>::const_iterator it = config_.errorPages.find(code);
+void Server::sendError(int code, Connection& conn)
+{
+    Response& res = conn.res;
 
-	request.setStatus(code);
-	if (it != config_.errorPages.end())
-		path = it->second;
+    res.status = code;
+    res.contentType = "text/html";
+    res.connectionType = "close";
 
-	if (!path.empty()) {
-		if (request.sendFile(path) > 0)
-			return;
+    const char* page;
+    size_t pageSize;
+
+    std::string path;
+    std::map<int, std::string>::const_iterator it = config_.errorPages.find(code);
+
+    if (it != config_.errorPages.end()) {
+        path = it->second;
 	}
 
-	page = generateDefaultPage(code, &pageSize);
-	request.setContentLength(pageSize);
-    request.setContentType("text/html");
-	header = generateHeader(request.getResponse());
-	request.sendAll(header, std::strlen(header));
-	request.sendAll(page, pageSize);
-	delete[] header;
+	conn.sendBuffer.clear();
+
+    if (!path.empty()) {
+		if (path[0] != '/') {
+			path = config_.root + '/' + path;
+		}
+
+        int fd = open(path.c_str(), O_RDONLY);
+        if (fd >= 0) {
+            std::string body;
+            char buf[4096];
+            ssize_t n;
+
+            while ((n = read(fd, buf, sizeof(buf))) > 0)
+                body.append(buf, n);
+
+            close(fd);
+
+            res.contentLength = toString(body.size());
+
+            std::string header = generateHeader(res);
+            conn.sendBuffer.append(header);
+            conn.sendBuffer.append(body);
+
+            modifyToWrite(conn.fd);
+            return;
+        }
+		log(WARNING, "Error page " + path + " not found");
+    }
+
+    page = generateDefaultPage(code, &pageSize);
+	
+    res.contentLength = toString(pageSize);
+
+    std::string header = generateHeader(res);
+
+    conn.sendBuffer.append(header);
+    conn.sendBuffer.append(page, pageSize);
+
+    modifyToWrite(conn.fd);
 }
+
