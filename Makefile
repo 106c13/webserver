@@ -12,9 +12,10 @@ OBJS_DIR = obj/
 INCLUDES = include/
 
 SRC_MAIN   = main.cpp
-SRC_SERVER = server.cpp network.cpp utils.cpp \
+SRC_SERVER = server.cpp utils.cpp \
              defaults.cpp path_resolver.cpp \
-			 autoindex.cpp cgi.cpp header_generator.cpp
+			 autoindex.cpp cgi.cpp header_generator.cpp \
+			 ClientHandler.cpp RequestHandler.cpp ResponseBuilder.cpp
 SRC_PARSER = ConfigParser.cpp RequestParser.cpp
 SRC_BUFFER = buffer.cpp
 
@@ -28,7 +29,7 @@ SRC = \
 OBJ = $(patsubst $(SRCS_DIR)%.cpp, $(OBJS_DIR)%.o, $(SRC))
 
 CXX = c++
-CXXFLAGS =  -std=c++98 -I $(INCLUDES)
+CXXFLAGS = -Wall -Wextra -Werror -std=c++98 -I $(INCLUDES)
 
 
 GREEN = \033[1;32m

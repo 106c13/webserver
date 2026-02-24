@@ -8,7 +8,65 @@
 #include "webserv.h"
 #include "ConfigParser.h"
 
+void Server::modifyToWrite(int fd) {
+    epoll_event ev;
+    ev.events = EPOLLIN | EPOLLOUT; // keep reading + allow writing
+    ev.data.fd = fd;
 
+    epoll_ctl(epollFd_, EPOLL_CTL_MOD, fd, &ev);
+}
+
+void Server::modifyToRead(int fd) {
+    epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.fd = fd;
+
+    epoll_ctl(epollFd_, EPOLL_CTL_MOD, fd, &ev);
+}
+
+void Server::closeConnection(int fd) {
+    epoll_ctl(epollFd_, EPOLL_CTL_DEL, fd, NULL);
+    close(fd);
+    connections_.erase(fd);
+    std::cout << "Client disconnected..." << std::endl;
+}
+
+void Server::handleClient(epoll_event& event) {
+    int fd = event.data.fd;
+
+	if (event.events & EPOLLIN) {
+        handleRead(connections_[fd]);
+	} else if (event.events & EPOLLOUT) {
+        handleWrite(connections_[fd]);
+	}
+}
+
+void Server::acceptConnection() {
+    sockaddr_in addr;
+    socklen_t len = sizeof(addr);
+
+    while (true) {
+        int clientFd = accept(serverFd_, (sockaddr*)&addr, &len);
+		if (clientFd < 0) {
+    		return;
+		}
+
+        fcntl(clientFd, F_SETFL, O_NONBLOCK);
+
+        epoll_event ev;
+        ev.events = EPOLLIN;
+        ev.data.fd = clientFd;
+
+        epoll_ctl(epollFd_, EPOLL_CTL_ADD, clientFd, &ev);
+
+		Connection& conn = connections_[clientFd];
+		conn.fd = clientFd;
+        conn.fileFd = -1;
+        conn.sendingFile = false;
+
+        std::cout << "New connection..." << std::endl;
+    }
+}
 
 void Server::initSocket() {
 	std::ostringstream oss;
@@ -46,6 +104,27 @@ void Server::initSocket() {
 	oss << "Server started on port ";
 	oss << config_.port;
 	log(INFO, oss.str()); 
+}
+
+void Server::loop() {
+    epoll_event events[1024];
+
+    while (true) {
+        int evCount = epoll_wait(epollFd_, events, 1024, -1);
+        if (evCount < 0)
+            continue;
+
+        for (int i = 0; i < evCount; i++) {
+            int fd = events[i].data.fd;
+            epoll_event& ev = events[i];
+
+            if (fd == serverFd_) {
+                acceptConnection();
+            } else {
+                handleClient(ev);
+            }
+        }
+    }
 }
 
 Server::Server(const ServerConfig& config) {
