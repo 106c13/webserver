@@ -47,6 +47,7 @@ struct Request {
 	std::vector<SetCookie>				setCookies;
 	std::vector<MultipartPart>			multipartParts;
 	std::string							boundary;
+	unsigned long						contentLenght;
 	Request();
 };
 

@@ -93,7 +93,7 @@ static const char* generateDefaultPage(int code, size_t* pageSize) {
 "</html>";
 	} 
 	log(ERROR, "Unkown error code");
-	return "";
+	return "<h1> SAY MY NAME </h1>";
 }
 
 void Server::sendError(int code, Connection& conn)

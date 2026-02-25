@@ -63,6 +63,8 @@ void Server::acceptConnection() {
 		conn.fd = clientFd;
         conn.fileFd = -1;
         conn.sendingFile = false;
+        conn.remainingBody = 0;
+        conn.state = READING_HEADERS;
 
         std::cout << "New connection..." << std::endl;
     }

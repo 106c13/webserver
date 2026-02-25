@@ -17,6 +17,14 @@
 #include "defines.h"
 #include "Buffer.h"
 
+
+enum ConnState {
+	READING_HEADERS = 64,
+	READING_BODY = 63,
+	PROCESSING = 62,
+	WRITING_RESPONSE = 61
+};
+
 struct Connection {
     int         fd;
 
@@ -30,6 +38,9 @@ struct Connection {
 
 	int			fileFd;
 	bool		sendingFile;
+	
+	size_t		remainingBody;
+	int			state;
 };
 
 

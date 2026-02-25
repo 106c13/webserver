@@ -26,32 +26,71 @@ void Server::handleRead(Connection& conn) {
     while (true) {
         ssize_t n = recv(conn.fd, buf, sizeof(buf), 0);
 
-        if (n > 0) {
+        if (n > 0)
             conn.recvBuffer.append(buf, n);
-        } else if (n == 0) {
+        else if (n == 0)
             return closeConnection(conn.fd);
+        else
+            break;
+    }
+
+    if (conn.state == READING_HEADERS) {
+        size_t endPos;
+
+        if (!requestComplete(conn.recvBuffer, endPos))
+            return;
+
+        std::string raw(conn.recvBuffer.data(), endPos);
+
+
+        parser_.parse(raw);
+        conn.req = parser_.getRequest();
+
+        conn.recvBuffer.consume(endPos);
+
+        conn.state = PROCESSING;
+
+        if (conn.req.method == "GET") {
+            handleRequest(conn);
+            return;
+        }
+
+        if (conn.req.method == "POST") {
+            if (conn.req.headers.find("Content-Length") == conn.req.headers.end())
+                return sendError(LENGTH_REQUIRED, conn);
+
+            conn.remainingBody = conn.req.contentLenght;
+
+            //if (conn.remainingBody > conn.configMaxBodySize)
+            //    return sendError(PAYLOAD_TOO_LARGE, conn);
+
+            conn.state = READING_BODY;
         } else {
-            if (errno == EAGAIN || errno == EWOULDBLOCK)
-                break;
-            return closeConnection(conn.fd);
+            return sendError(METHOD_NOT_ALLOWED, conn);
         }
     }
 
-	size_t endPos;
-	while (requestComplete(conn.recvBuffer, endPos)) {
-    	std::string raw(conn.recvBuffer.data(), endPos);
+    if (conn.state == READING_BODY) {
+        size_t available = conn.recvBuffer.size();
 
-		parser_.parse(raw);
-		conn.req = parser_.getRequest();
+        if (available == 0)
+            return;
 
-		conn.recvBuffer.consume(endPos);
+        size_t toConsume = std::min(available, conn.remainingBody);
 
-		handleRequest(conn);
-	}
+        conn.req.body.append(conn.recvBuffer.data(), toConsume);
 
-    if (!conn.sendBuffer.empty()) {
-        modifyToWrite(conn.fd);
+        conn.recvBuffer.consume(toConsume);
+        conn.remainingBody -= toConsume;
+
+        if (conn.remainingBody == 0) {
+            conn.state = PROCESSING;
+            handleRequest(conn);
+        }
     }
+
+    if (!conn.sendBuffer.empty())
+        modifyToWrite(conn.fd);
 }
 
 void Server::handleWrite(Connection& conn) {
