@@ -1,3 +1,4 @@
+#include <fcntl.h>
 #include "webserv.h"
 #include "ConfigParser.h"
 
@@ -49,24 +50,48 @@ void Server::handleRequest(Connection& conn) {
         return sendError(status, conn);
 
     res.path = req.path;
+
     if (req.method == "POST") {
-        res.status = OK;
-        res.contentLength = "0";
+        std::string contentType = req.headers["Content-Type"];
 
-        for (std::vector<MultipartPart>::iterator it = req.multipartParts.begin();
-             it != req.multipartParts.end();
-             it++) {
-            std::cout << "Name: " << (*it).name << std::endl;
-            std::cout << "Data:" << (*it).data << std::endl;
+        if (contentType.find("multipart/form-data") != std::string::npos) {
+            std::map<std::string, std::string> formFields;
+
+            for (std::vector<MultipartPart>::iterator it = req.multipartParts.begin();
+                 it != req.multipartParts.end();
+                 ++it)
+            {
+                if (!it->filename.empty()) {
+                    std::string uploadDir = location.uploadDir;
+                    std::string safeName = it->filename;
+
+                    size_t slash = safeName.find_last_of("/\\");
+                    if (slash != std::string::npos)
+                        safeName = safeName.substr(slash + 1);
+
+                    std::string fullPath = uploadDir + "/" + safeName;
+                    std::cout << fullPath << std::endl;
+
+                    int fd = open(fullPath.c_str(),
+                                  O_WRONLY | O_CREAT | O_TRUNC,
+                                  0644);
+
+                    if (fd < 0)
+                        return sendError(SERVER_ERROR, conn);
+
+                    ssize_t written = write(fd,
+                                            it->data.data(),
+                                            it->data.size());
+
+                    close(fd);
+
+                    if (written < 0)
+                        return sendError(SERVER_ERROR, conn);
+                } else {
+                    formFields[it->name] = it->data;
+                }
+            }
         }
-        std::string header = generateHeader(conn.res);
-        std::cout << "==================\n";
-        std::cout << header;
-        conn.sendBuffer.append(header);
-
-        //conn.state = WRITING;
-        modifyToWrite(conn.fd);
-        return;
     }
 
     if (!prepareFileResponse(conn, req.path))

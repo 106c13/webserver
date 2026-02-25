@@ -46,11 +46,11 @@ void Server::handleRead(Connection& conn) {
         parser_.parse(raw);
         conn.req = parser_.getRequest();
 
-        conn.recvBuffer.consume(endPos);
 
         conn.state = PROCESSING;
 
         if (conn.req.method == "GET") {
+            conn.recvBuffer.consume(endPos);
             handleRequest(conn);
             return;
         }
@@ -58,7 +58,8 @@ void Server::handleRead(Connection& conn) {
         if (conn.req.method == "POST") {
             if (conn.req.headers.find("Content-Length") == conn.req.headers.end())
                 return sendError(LENGTH_REQUIRED, conn);
-
+            conn.req.body.append(raw);
+            conn.recvBuffer.consume(endPos);
             conn.remainingBody = conn.req.contentLenght;
 
             //if (conn.remainingBody > conn.configMaxBodySize)
@@ -85,6 +86,8 @@ void Server::handleRead(Connection& conn) {
 
         if (conn.remainingBody == 0) {
             conn.state = PROCESSING;
+            parser_.parse(conn.req.body);
+            conn.req = parser_.getRequest();
             handleRequest(conn);
         }
     }
