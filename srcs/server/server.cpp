@@ -10,7 +10,7 @@
 
 void Server::modifyToWrite(int fd) {
     epoll_event ev;
-    ev.events = EPOLLIN | EPOLLOUT; // keep reading + allow writing
+    ev.events = EPOLLIN | EPOLLOUT;
     ev.data.fd = fd;
 
     epoll_ctl(epollFd_, EPOLL_CTL_MOD, fd, &ev);
@@ -31,14 +31,85 @@ void Server::closeConnection(int fd) {
     std::cout << "Client disconnected..." << std::endl;
 }
 
+static bool requestComplete(const Buffer& buf, size_t& endPos) {
+    const char* data = buf.data();
+    size_t len = buf.size();
+
+    for (size_t i = 0; i + 3 < len; ++i) {
+        if (data[i] == '\r' &&
+            data[i+1] == '\n' &&
+            data[i+2] == '\r' &&
+            data[i+3] == '\n')
+        {
+            endPos = i + 4;
+            return true;
+        }
+    }
+    return false;
+}
+
 void Server::handleClient(epoll_event& event) {
     int fd = event.data.fd;
+	Connection& conn = connections_[fd];
 
 	if (event.events & EPOLLIN) {
-        handleRead(connections_[fd]);
+        handleRead(conn);
 	} else if (event.events & EPOLLOUT) {
-        handleWrite(connections_[fd]);
+        return handleWrite(conn);
 	}
+
+    if (conn.state == READING_HEADERS) {
+        size_t endPos;
+
+        if (!requestComplete(conn.recvBuffer, endPos))
+            return;
+
+        std::string raw(conn.recvBuffer.data(), endPos);
+
+        parser_.parse(raw);
+        conn.req = parser_.getRequest();
+
+        if (conn.req.method == "GET") {
+        	conn.state = PROCESSING;
+            conn.recvBuffer.consume(endPos);
+            handleRequest(conn);
+            return;
+        } else if (conn.req.method == "POST") {
+            if (conn.req.headers.find("Content-Length") == conn.req.headers.end())
+                return sendError(LENGTH_REQUIRED, conn);
+            conn.req.body.append(raw);
+            conn.recvBuffer.consume(endPos);
+            conn.remainingBody = conn.req.contentLenght;
+
+            //if (conn.remainingBody > conn.configMaxBodySize)
+            //    return sendError(PAYLOAD_TOO_LARGE, conn);
+
+            conn.state = READING_BODY;
+        } else {
+            return sendError(METHOD_NOT_ALLOWED, conn);
+        }
+    }
+
+    if (conn.state == READING_BODY) {
+        size_t available = conn.recvBuffer.size();
+
+        if (available == 0)
+            return;
+
+        size_t toConsume = std::min(available, conn.remainingBody);
+
+        conn.req.body.append(conn.recvBuffer.data(), toConsume);
+
+        conn.recvBuffer.consume(toConsume);
+        conn.remainingBody -= toConsume;
+
+        if (conn.remainingBody == 0) {
+            conn.state = PROCESSING;
+            parser_.parse(conn.req.body);
+            conn.req = parser_.getRequest();
+            handleRequest(conn);
+        }
+    }
 }
 
 void Server::acceptConnection() {
@@ -61,7 +132,6 @@ void Server::acceptConnection() {
 
 		Connection& conn = connections_[clientFd];
 		conn.fd = clientFd;
-        conn.fileFd = -1;
         conn.sendingFile = false;
         conn.remainingBody = 0;
         conn.state = READING_HEADERS;
@@ -85,7 +155,6 @@ void Server::initSocket() {
 		throw std::runtime_error("setsockopt() failed");
 	}
 
-	// value-initialize (NO memset)
 	addr_ = sockaddr_in();
 	addr_.sin_family = AF_INET;
 	addr_.sin_addr.s_addr = INADDR_ANY;

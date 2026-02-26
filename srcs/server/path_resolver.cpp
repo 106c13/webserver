@@ -38,22 +38,14 @@ int Server::resolvePath(std::string& path, LocationConfig& location) {
                 continue;
             }
 
-            if (access(tmp.c_str(), R_OK) != 0) {
-                return FORBIDDEN;
-            }
-
             path = tmp;
             return OK;
         }
-        return 1;
+        return DIRECTORY_NO_INDEX;
     }
 
     if (!S_ISREG(st.st_mode)) {
         return NOT_FOUND;
-    }
-
-    if (access(path.c_str(), R_OK) != 0) {
-        return FORBIDDEN;
     }
 
     return OK;

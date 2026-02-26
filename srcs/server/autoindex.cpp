@@ -24,6 +24,7 @@ static std::string humanSize(size_t bytes)
 
 void Server::generateAutoindex(Connection& conn, LocationConfig& location)
 {
+	std::cout << "I was here\n";
     Request& req = conn.req;
     Response& res = conn.res;
 
@@ -62,7 +63,7 @@ void Server::generateAutoindex(Connection& conn, LocationConfig& location)
 
         page += "<td>";
         page += icon;
-        page += "<a href=\"" + path + it->name + "\">" + it->name + "</a>";
+        page += "<a style=\"margin-left:15px;\" href=\"" + path + it->name + "\">" + it->name + "</a>";
         page += "</td>";
 
         page += "<td style=\"text-align:right; padding-left:40px;\">";
@@ -85,4 +86,5 @@ void Server::generateAutoindex(Connection& conn, LocationConfig& location)
     conn.sendBuffer.append(page);
 
     modifyToWrite(conn.fd);
+	std::cout << "I was there\n";
 }

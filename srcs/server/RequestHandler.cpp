@@ -2,19 +2,11 @@
 #include "webserv.h"
 #include "ConfigParser.h"
 
-int checkRequest(const Request& request, const LocationConfig& location) {
-	if (request.method != "GET" && 
-		request.method != "POST" &&
-        request.method != "DELETE")
-    {
-		return BAD_REQUEST;
-    }
-
+static int checkRequest(const Request& request, const LocationConfig& location) {
 	if (location.methods.empty()) {
         return OK;
 	}
 
-	std::cout <<  "Method: " << request.method << std::endl;
     for (std::vector<std::string>::const_iterator it = location.methods.begin();
          it != location.methods.end();
          ++it) {
@@ -30,9 +22,6 @@ void Server::handleRequest(Connection& conn) {
     Response& res = conn.res;
     log(INFO, req.version + " " + req.method + " " + req.uri);
     
-    std::cout << req.body << std::endl; 
-
-
     LocationConfig location = resolveLocation(req.path);
 
     int status = checkRequest(req, location);
@@ -44,7 +33,7 @@ void Server::handleRequest(Connection& conn) {
 
     status = resolvePath(req.path, location);
 
-    if (status == 1 && location.autoindex)
+    if (status == DIRECTORY_NO_INDEX && location.autoindex)
         return generateAutoindex(conn, location);
 	else if (status != OK)
         return sendError(status, conn);
@@ -93,7 +82,7 @@ void Server::handleRequest(Connection& conn) {
             }
         }
     }
-
+	conn.res.status = OK;
     if (!prepareFileResponse(conn, req.path))
         return sendError(SERVER_ERROR, conn);
 

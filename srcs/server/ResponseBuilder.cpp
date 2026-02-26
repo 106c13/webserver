@@ -31,13 +31,14 @@ bool Server::prepareFileResponse(Connection& conn, const std::string& path) {
     }
 
     Response& res = conn.res;
-    res.status = OK;
     res.path = path;
     res.contentLength = toString(size);
     res.connectionType = "close";
 
     std::string header = generateHeader(res);
     conn.sendBuffer.append(header);
+
+	log(INFO, header.substr(0, header.find("\n")));
 
     conn.fileFd = fd;
     conn.sendingFile = true;

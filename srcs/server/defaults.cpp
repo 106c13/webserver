@@ -59,6 +59,22 @@ static const char* generateDefaultPage(int code, size_t* pageSize) {
 	<p>WebServ 42</p>\n\
 </body>\n\
 </html>";
+	} else if (code == METHOD_NOT_ALLOWED) {
+		*pageSize = 240;
+		return
+"<!DOCTYPE html>\n\
+<html>\n\
+<head>\n\
+	<meta charset=\"UTF-8\">\n\
+	<title>405 Method not allowed</title>\n\
+</head>\n\
+<body>\n\
+	<h1>405 Method not allowed</h1>\n\
+	<p>The server does allow you to use this method.</p>\n\
+	<hr>\n\
+	<p>WebServ 42</p>\n\
+</body>\n\
+</html>";
 	} else if (code == SERVER_ERROR) {
 		*pageSize = 297;
 		return
@@ -100,12 +116,10 @@ void Server::sendError(int code, Connection& conn)
 {
     Response& res = conn.res;
 
+	conn.sendBuffer.clear();
+
     res.status = code;
     res.contentType = "text/html";
-    res.connectionType = "close";
-
-    const char* page;
-    size_t pageSize;
 
     std::string path;
     std::map<int, std::string>::const_iterator it = config_.errorPages.find(code);
@@ -114,40 +128,24 @@ void Server::sendError(int code, Connection& conn)
         path = it->second;
 	}
 
-	conn.sendBuffer.clear();
-
     if (!path.empty()) {
 		if (path[0] != '/') {
 			path = config_.root + '/' + path;
 		}
+		
+		if (prepareFileResponse(conn, path)) {
+			return modifyToWrite(conn.fd);
+		}	
 
-        int fd = open(path.c_str(), O_RDONLY);
-        if (fd >= 0) {
-            std::string body;
-            char buf[4096];
-            ssize_t n;
-
-            while ((n = read(fd, buf, sizeof(buf))) > 0)
-                body.append(buf, n);
-
-            close(fd);
-
-            res.contentLength = toString(body.size());
-
-            std::string header = generateHeader(res);
-            conn.sendBuffer.append(header);
-            conn.sendBuffer.append(body);
-
-            modifyToWrite(conn.fd);
-            return;
-        }
 		log(WARNING, "Error page " + path + " not found");
     }
 
-    page = generateDefaultPage(code, &pageSize);
-	
-    res.contentLength = toString(pageSize);
+    const char* page;
+    size_t pageSize;
 
+
+    page = generateDefaultPage(code, &pageSize);	
+    res.contentLength = toString(pageSize);
     std::string header = generateHeader(res);
 
     conn.sendBuffer.append(header);
