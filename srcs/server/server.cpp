@@ -75,11 +75,12 @@ void Server::handleClient(epoll_event& event) {
             handleRequest(conn);
             return;
         } else if (conn.req.method == "POST") {
-            if (conn.req.headers.find("Content-Length") == conn.req.headers.end())
-                return sendError(LENGTH_REQUIRED, conn);
+            StringMap::iterator it = conn.req.headers.find("Content-Length");
+            if (it == conn.req.headers.end())
+                return sendError(BAD_REQUEST, conn);
             conn.req.body.append(raw);
             conn.recvBuffer.consume(endPos);
-            conn.remainingBody = conn.req.contentLenght;
+            conn.remainingBody = std::strtoul(it->second.c_str(), NULL, 10);
 
             //if (conn.remainingBody > conn.configMaxBodySize)
             //    return sendError(PAYLOAD_TOO_LARGE, conn);
