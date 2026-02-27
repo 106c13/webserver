@@ -39,12 +39,22 @@ void Server::handleRequest(Connection& conn) {
         return sendError(status, conn);
 
     res.path = req.path;
-
-    if (req.method == "POST") {
+	
+	std::string cgiPath = findCGI(req.path, location.cgi);
+	
+	if (!cgiPath.empty()) {
+		int fd = runCGI(cgiPath.c_str(), conn);
+		if (fd < 0) {
+			return sendError(SERVER_ERROR, conn);
+        }
+        return sendCGIOutput(conn, fd);
+	}
+	
+	if (req.method == "POST") {
         std::string contentType = req.headers["Content-Type"];
 
         if (contentType.find("multipart/form-data") != std::string::npos) {
-            std::map<std::string, std::string> formFields;
+            StringMap formFields;
 
             for (std::vector<MultipartPart>::iterator it = req.multipartParts.begin();
                  it != req.multipartParts.end();
