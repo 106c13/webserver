@@ -17,6 +17,14 @@
 #include "defines.h"
 #include "Buffer.h"
 
+
+enum ConnState {
+	READING_HEADERS = 64,
+	READING_BODY = 63,
+	PROCESSING = 62,
+	WRITING_RESPONSE = 61
+};
+
 struct Connection {
     int         fd;
 
@@ -30,6 +38,9 @@ struct Connection {
 
 	int			fileFd;
 	bool		sendingFile;
+	
+	size_t		remainingBody;
+	int			state;
 };
 
 
@@ -60,7 +71,7 @@ class	Server {
 		void			modifyToWrite(int fd);
 		void			modifyToRead(int fd);
 		void			closeConnection(int fd);
-		int				runCGI(const char* path, const char* cgiPath, Connection& conn);
+		int				runCGI(const char* cgiPath, Connection& conn);
 		void			sendCGIOutput(Connection& conn, int cgiFd);
 		void			handleRequest(Connection& conn);
 		int				resolvePath(std::string& path, LocationConfig& location);
@@ -71,6 +82,7 @@ class	Server {
 		bool			prepareFileResponse(Connection& conn, const std::string& path);
 		bool			streamFileChunk(Connection& conn);
 		void			sendError(int code, Connection& conn);
+		char**			createEnvironment(const Request& req);
 
 	public:
 		Server(const ServerConfig& config); // Start server with configurations from file

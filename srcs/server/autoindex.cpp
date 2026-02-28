@@ -62,7 +62,7 @@ void Server::generateAutoindex(Connection& conn, LocationConfig& location)
 
         page += "<td>";
         page += icon;
-        page += "<a href=\"" + path + it->name + "\">" + it->name + "</a>";
+        page += "<a style=\"margin-left:15px;\" href=\"" + path + it->name + "\">" + it->name + "</a>";
         page += "</td>";
 
         page += "<td style=\"text-align:right; padding-left:40px;\">";

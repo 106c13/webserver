@@ -244,10 +244,12 @@ void RequestParser::parseHeaders() {
 		}
 	}
 
-	std::map<std::string, std::string>::iterator it = _request.headers.find("Content-Type");
-	if (it != _request.headers.end()) {
-		_request.boundary = extractBoundary(it->second);
-	}
+    std::map<std::string, std::string>::iterator it;
+
+    it = _request.headers.find("Content-Type");
+    if (it != _request.headers.end()) {
+        _request.boundary = extractBoundary(it->second);
+    }
 }
 
 void RequestParser::parseBody() {

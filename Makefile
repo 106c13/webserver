@@ -12,9 +12,10 @@ OBJS_DIR = obj/
 INCLUDES = include/
 
 SRC_MAIN   = main.cpp
-SRC_SERVER = server.cpp network.cpp utils.cpp \
+SRC_SERVER = server.cpp utils.cpp \
              defaults.cpp path_resolver.cpp \
-			 autoindex.cpp cgi.cpp header_generator.cpp
+			 autoindex.cpp cgi.cpp header_generator.cpp \
+			 ClientHandler.cpp RequestHandler.cpp ResponseBuilder.cpp
 SRC_PARSER = ConfigParser.cpp RequestParser.cpp
 SRC_BUFFER = buffer.cpp
 

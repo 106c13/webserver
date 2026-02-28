@@ -2,36 +2,45 @@
 #include "defines.h"
 #include "webserv.h"
 
-static char** createEviroment(const Request& req)
-{
-    char** env = new char*[5];
+char** Server::createEnvironment(const Request& req) {
+    char** env = new char*[11];
+    int i = 0;
 
     std::string method = "REQUEST_METHOD=" + req.method;
-    env[0] = strdup(method.c_str());
+    env[i++] = strdup(method.c_str());
+
+	std::string redirectStatus = "REDIRECT_STATUS=200";
+	env[i++] = strdup(redirectStatus.c_str());
 
     std::string script = "SCRIPT_FILENAME=" + req.path;
-    env[1] = strdup(script.c_str());
+    env[i++] = strdup(script.c_str());
 
-    env[2] = strdup("REDIRECT_STATUS=200");
+    std::string query = "QUERY_STRING=" + req.queryString;
+    env[i++] = strdup(query.c_str());
 
-    std::string query = "QUERY_STRING=";
-    bool first = true;
+    std::string protocol = "SERVER_PROTOCOL=HTTP/1.1";
+    env[i++] = strdup(protocol.c_str());
 
-    for (StringMap::const_iterator it = req.queryParams.begin();
-         it != req.queryParams.end();
-         ++it)
-    {
-        if (!first)
-            query += "&";
-        first = false;
+    std::string gateway = "GATEWAY_INTERFACE=CGI/1.1";
+    env[i++] = strdup(gateway.c_str());
 
-        query += it->first;
-        query += "=";
-        query += it->second;
+    std::string serverName = "SERVER_NAME=127.0.0.1";
+    env[i++] = strdup(serverName.c_str());
+
+    std::string serverPort = "SERVER_PORT=" + toString(config_.port);
+    env[i++] = strdup(serverPort.c_str());
+
+    if (req.method == "POST") {
+        std::string contentLength =
+            "CONTENT_LENGTH=" + req.headers.at("Content-Length");
+        env[i++] = strdup(contentLength.c_str());
+
+        std::string contentType =
+            "CONTENT_TYPE=" + req.headers.at("Content-Type");
+        env[i++] = strdup(contentType.c_str());
     }
 
-    env[3] = strdup(query.c_str());
-    env[4] = NULL;
+    env[i] = NULL;
 
     return env;
 }
@@ -69,7 +78,7 @@ void Server::sendCGIOutput(Connection& conn, int cgiFd) {
     modifyToWrite(conn.fd);
 }
 
-int Server::runCGI(const char* path, const char* cgiPath, Connection& conn) {
+int Server::runCGI(const char* cgiPath, Connection& conn) {
 	int		pipefd[2];
 	pid_t	pid;
 	char**	env;
@@ -86,13 +95,13 @@ int Server::runCGI(const char* path, const char* cgiPath, Connection& conn) {
 	} else if (pid == 0) {
 		close(pipefd[0]);
 
-		env = createEviroment(conn.req);
+		env = createEnvironment(conn.req);
 		dup2(pipefd[1], STDOUT_FILENO);
 		dup2(pipefd[1], STDERR_FILENO);
 		close(pipefd[1]);
 		char* argv[] = {
 			strdup(cgiPath),
-			strdup(path),
+			strdup(conn.req.path.c_str()),
             NULL
         };
 		execve(cgiPath, argv, env);
