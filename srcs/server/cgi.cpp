@@ -41,6 +41,7 @@ char** Server::createEnvironment(const Request& req) {
     }
 
     env[i] = NULL;
+
     return env;
 }
 

@@ -112,8 +112,7 @@ static const char* generateDefaultPage(int code, size_t* pageSize) {
 	return "<h1> SAY MY NAME </h1>";
 }
 
-void Server::sendError(int code, Connection& conn)
-{
+void Server::sendError(int code, Connection& conn) {
     Response& res = conn.res;
 
 	conn.sendBuffer.clear();
@@ -143,7 +142,6 @@ void Server::sendError(int code, Connection& conn)
     const char* page;
     size_t pageSize;
 
-
     page = generateDefaultPage(code, &pageSize);	
     res.contentLength = toString(pageSize);
     std::string header = generateHeader(res);
@@ -153,4 +151,3 @@ void Server::sendError(int code, Connection& conn)
 
     modifyToWrite(conn.fd);
 }
-

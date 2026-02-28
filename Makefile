@@ -29,7 +29,7 @@ SRC = \
 OBJ = $(patsubst $(SRCS_DIR)%.cpp, $(OBJS_DIR)%.o, $(SRC))
 
 CXX = c++
-CXXFLAGS = -Wall -Wextra -Werror -std=c++98 -I $(INCLUDES)
+CXXFLAGS =  -std=c++98 -I $(INCLUDES)
 
 
 GREEN = \033[1;32m

@@ -24,7 +24,6 @@ static std::string humanSize(size_t bytes)
 
 void Server::generateAutoindex(Connection& conn, LocationConfig& location)
 {
-	std::cout << "I was here\n";
     Request& req = conn.req;
     Response& res = conn.res;
 
@@ -86,5 +85,4 @@ void Server::generateAutoindex(Connection& conn, LocationConfig& location)
     conn.sendBuffer.append(page);
 
     modifyToWrite(conn.fd);
-	std::cout << "I was there\n";
 }
