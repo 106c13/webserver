@@ -17,6 +17,11 @@ static int checkRequest(const Request& request, const LocationConfig& location) 
     return METHOD_NOT_ALLOWED;
 }
 
+int Server::deleteResource(const std::string& path) {
+
+}
+
+
 void Server::handleRequest(Connection& conn) {
     Request& req = conn.req;
     Response& res = conn.res;
@@ -40,6 +45,11 @@ void Server::handleRequest(Connection& conn) {
         return sendError(status, conn);
 
     res.path = req.path;
+	
+	if (req.method == "DELETE") {
+		status = deleteResource(req.path);
+		return sendError(status, conn);
+	}
 	
 	std::string cgiPath = findCGI(req.path, location.cgi);
 
