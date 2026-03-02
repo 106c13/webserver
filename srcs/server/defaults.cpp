@@ -107,7 +107,12 @@ static const char* generateDefaultPage(int code, size_t* pageSize) {
 "    <p>WebServ 42</p>\n"
 "</body>\n"
 "</html>";
+	} else if (code == NO_CONTENT
+			|| code == LENGTH_REQUIRED ) {
+		*pageSize = 0;
+		return "";
 	} 
+
 	log(ERROR, "Unkown error code");
 	return "<h1> SAY MY NAME </h1>";
 }
