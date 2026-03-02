@@ -68,12 +68,14 @@ void Server::handleClient(epoll_event& event) {
 
         parser_.parse(raw);
         conn.req = parser_.getRequest();
+		
 
-        if (conn.req.method == "GET") {
+		// TODO: check for resource 
+
+        if (conn.req.method == "GET" || conn.req.method == "DELETE") {
         	conn.state = PROCESSING;
             conn.recvBuffer.consume(endPos);
             handleRequest(conn);
-            return;
         } else if (conn.req.method == "POST") {
             StringMap::iterator it = conn.req.headers.find("Content-Length");
             if (it == conn.req.headers.end())
