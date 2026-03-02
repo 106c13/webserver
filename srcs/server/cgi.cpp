@@ -1,4 +1,6 @@
 #include <string.h>
+#include <sstream>
+#include <unistd.h>
 #include "defines.h"
 #include "webserv.h"
 
@@ -55,22 +57,49 @@ void Server::sendCGIOutput(Connection& conn, int cgiFd) {
 
     close(cgiFd);
 
-    std::string body;
+    Response& res = conn.res;
 
     size_t pos = cgiOut.find("\r\n\r\n");
-    if (pos != std::string::npos) {
+    std::string cgiHeaders;
+    std::string body;
+
+    if (pos != std::string::npos)
+    {
+        cgiHeaders = cgiOut.substr(0, pos);
         body = cgiOut.substr(pos + 4);
-    } else {
+    }
+    else
+    {
         body = cgiOut;
     }
 
-    Response& res = conn.res;
-    res.status = OK;
-    res.contentLength = toString(body.size());
+    // Default values
     res.contentType = "text/html";
+    res.status = OK;
+
+    // Parse CGI headers (C++98 style)
+    std::istringstream stream(cgiHeaders);
+    std::string line;
+
+    while (std::getline(stream, line))
+    {
+        if (!line.empty() && line[line.size() - 1] == '\r')
+            line.erase(line.size() - 1);
+
+        if (line.find("Status:") == 0)
+        {
+            res.status = atoi(line.substr(7).c_str());
+        }
+        else if (line.find("Location:") == 0)
+        {
+            res.location = line.substr(10);
+        }
+    }
+
+    res.contentLength = toString(body.size());
 
     std::string header = generateHeader(res);
-    std::cout << header << std::endl;
+    std::cout << header;
 
     conn.sendBuffer.append(header);
     conn.sendBuffer.append(body);
@@ -79,37 +108,68 @@ void Server::sendCGIOutput(Connection& conn, int cgiFd) {
 }
 
 int Server::runCGI(const char* cgiPath, Connection& conn) {
-	int		pipefd[2];
-	pid_t	pid;
-	char**	env;
+    int stdinPipe[2];
+    int stdoutPipe[2];
 
-	if (pipe(pipefd) < 0) {
-		log(ERROR, "PIPE ERROR");
-		return -1;
-	}
+    if (pipe(stdinPipe) < 0 || pipe(stdoutPipe) < 0) {
+        log(ERROR, "PIPE ERROR");
+        return -1;
+    }
 
-	pid = fork();
-	if (pid < 0) {
-		log(ERROR, "FORK ERROR");
-		return -1;
-	} else if (pid == 0) {
-		close(pipefd[0]);
+    pid_t pid = fork();
+    if (pid < 0) {
+        log(ERROR, "FORK ERROR");
+        return -1;
+    }
 
-		env = createEnvironment(conn.req);
-		dup2(pipefd[1], STDOUT_FILENO);
-		dup2(pipefd[1], STDERR_FILENO);
-		close(pipefd[1]);
-		char* argv[] = {
-			strdup(cgiPath),
-			strdup(conn.req.path.c_str()),
+    if (pid == 0) {
+        dup2(stdinPipe[0], STDIN_FILENO);
+        dup2(stdoutPipe[1], STDOUT_FILENO);
+        dup2(stdoutPipe[1], STDERR_FILENO);
+
+        close(stdinPipe[1]);
+        close(stdoutPipe[0]);
+        close(stdinPipe[0]);
+        close(stdoutPipe[1]);
+
+        char** env = createEnvironment(conn.req);
+
+        char* argv[] = {
+            const_cast<char*>(cgiPath),
+            const_cast<char*>(conn.req.path.c_str()),
             NULL
         };
-		execve(cgiPath, argv, env);
-		_exit(1);
-	}
 
-	close(pipefd[1]);
-    return pipefd[0];
+        execve(cgiPath, argv, env);
+        _exit(1);
+    }
+
+
+    close(stdinPipe[0]);
+    close(stdoutPipe[1]);
+
+    if (conn.req.method == "POST") {
+        const std::string& body = conn.req.body;
+        size_t size = body.size();
+        size_t total = 0;
+
+        while (total < size) {
+            ssize_t n = write(stdinPipe[1],
+                              body.data() + total,
+                              size - total);
+
+            if (n <= 0) {
+                log(ERROR, "WRITE TO CGI STDIN FAILED");
+                break;
+            }
+
+            total += n;
+        }
+    }
+
+    close(stdinPipe[1]);
+
+    return stdoutPipe[0];
 }
 
 std::string Server::findCGI(const std::string& fileName, const StringMap& cgiMap) {

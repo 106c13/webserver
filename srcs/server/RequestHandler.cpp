@@ -21,6 +21,7 @@ void Server::handleRequest(Connection& conn) {
     Request& req = conn.req;
     Response& res = conn.res;
     log(INFO, req.version + " " + req.method + " " + req.uri);
+
     
     LocationConfig location = resolveLocation(req.path);
 
@@ -41,7 +42,7 @@ void Server::handleRequest(Connection& conn) {
     res.path = req.path;
 	
 	std::string cgiPath = findCGI(req.path, location.cgi);
-	
+
 	if (!cgiPath.empty()) {
 		int fd = runCGI(cgiPath.c_str(), conn);
 		if (fd < 0) {

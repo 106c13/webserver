@@ -84,5 +84,7 @@ void Server::generateAutoindex(Connection& conn, LocationConfig& location)
     conn.sendBuffer.append(header);
     conn.sendBuffer.append(page);
 
+	log(INFO, header.substr(0, header.find("\n")));
+
     modifyToWrite(conn.fd);
 }
