@@ -6,6 +6,8 @@
 static std::string getStatus(int code) {
     if (code == OK) {
         return "200 OK";
+    } else if (code == NO_CONTENT) {
+        return "204 No Content";
     } else if (code == REDIRECT) {
         return "301 Moved Permanently";
     } else if (code == BAD_REQUEST) {

@@ -47,6 +47,10 @@ int Server::resolvePath(std::string& path, LocationConfig& location) {
     if (!S_ISREG(st.st_mode)) {
         return NOT_FOUND;
     }
+    
+    if (access(path.c_str(), R_OK | W_OK) != 0) {
+        return FORBIDDEN;
+    }
 
     return OK;
 }

@@ -24,6 +24,7 @@ enum Method {
 
 enum Page {
 	OK = 200,
+	NO_CONTENT = 204,
 	REDIRECT = 301,
 	BAD_REQUEST = 400,
 	NOT_FOUND = 404,

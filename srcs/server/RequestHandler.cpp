@@ -1,4 +1,5 @@
 #include <fcntl.h>
+#include <cstdio>
 #include "webserv.h"
 #include "ConfigParser.h"
 
@@ -17,8 +18,14 @@ static int checkRequest(const Request& request, const LocationConfig& location) 
     return METHOD_NOT_ALLOWED;
 }
 
-int Server::deleteResource(const std::string& path) {
+int deleteResource(const std::string& path) {
+    if (access(path.c_str(), W_OK) != 0)
+        return FORBIDDEN;
 
+    if (remove(path.c_str()) != 0)
+        return SERVER_ERROR;
+
+    return NO_CONTENT;
 }
 
 
@@ -30,18 +37,21 @@ void Server::handleRequest(Connection& conn) {
     LocationConfig location = resolveLocation(req.path);
 
     int status = checkRequest(req, location);
-    if (status != OK)
+    if (status != OK) {
         return sendError(status, conn);
+    }
 
-    if (location.redirectCode != 0)
+    if (location.redirectCode != 0) {
         return sendRedirect(conn, location);
+    }
 
     status = resolvePath(req.path, location);
 
-    if (status == DIRECTORY_NO_INDEX && location.autoindex)
+    if (status == DIRECTORY_NO_INDEX && location.autoindex) {
         return generateAutoindex(conn, location);
-	else if (status != OK)
+    } else if (status != OK) {
         return sendError(status, conn);
+    }
 
     res.path = req.path;
 	
