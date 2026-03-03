@@ -61,6 +61,8 @@ struct Connection {
 	
 	size_t		remainingBody;
 	int			state;
+	
+	bool		closed;
 };
 
 

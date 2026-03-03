@@ -74,6 +74,7 @@ void Server::sendCGIOutput(Connection& conn, int cgiFd) {
 
     conn.sendBuffer.append(header);
     conn.sendBuffer.append(body);
+    conn.closed = true;
 
     modifyToWrite(conn.fd);
 }

@@ -153,6 +153,7 @@ void Server::sendError(int code, Connection& conn) {
 
     conn.sendBuffer.append(header);
     conn.sendBuffer.append(page, pageSize);
+	conn.closed = true;
 
     modifyToWrite(conn.fd);
 }

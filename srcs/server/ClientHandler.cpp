@@ -36,7 +36,12 @@ void Server::handleWrite(Connection& conn) {
         streamFileChunk(conn);
     }
 
+    if (conn.closed) {
+        closeConnection(conn.fd);
+    }
+
     if (conn.sendBuffer.empty()) {
         modifyToRead(conn.fd);
     }
+
 }
