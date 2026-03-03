@@ -122,6 +122,9 @@ void Server::sendError(int code, Connection& conn) {
 
 	conn.sendBuffer.clear();
 
+	if (code == DIRECTORY_NO_INDEX)
+		code = NOT_FOUND;
+
     res.status = code;
     res.contentType = "text/html";
 

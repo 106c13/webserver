@@ -49,7 +49,7 @@ char** Server::createEnvironment(const Request& req) {
 
 void Server::sendCGIOutput(Connection& conn, int cgiFd) {
     std::string cgiOut;
-    char buf[8192];
+    char buf[1024];
     ssize_t n;
 
     while ((n = read(cgiFd, buf, sizeof(buf))) > 0)
@@ -63,35 +63,26 @@ void Server::sendCGIOutput(Connection& conn, int cgiFd) {
     std::string cgiHeaders;
     std::string body;
 
-    if (pos != std::string::npos)
-    {
+    if (pos != std::string::npos) {
         cgiHeaders = cgiOut.substr(0, pos);
         body = cgiOut.substr(pos + 4);
-    }
-    else
-    {
+    } else {
         body = cgiOut;
     }
 
-    // Default values
     res.contentType = "text/html";
     res.status = OK;
 
-    // Parse CGI headers (C++98 style)
     std::istringstream stream(cgiHeaders);
     std::string line;
 
-    while (std::getline(stream, line))
-    {
+    while (std::getline(stream, line)) {
         if (!line.empty() && line[line.size() - 1] == '\r')
             line.erase(line.size() - 1);
 
-        if (line.find("Status:") == 0)
-        {
+        if (line.find("Status:") == 0) {
             res.status = atoi(line.substr(7).c_str());
-        }
-        else if (line.find("Location:") == 0)
-        {
+        } else if (line.find("Location:") == 0) {
             res.location = line.substr(10);
         }
     }
@@ -99,7 +90,6 @@ void Server::sendCGIOutput(Connection& conn, int cgiFd) {
     res.contentLength = toString(body.size());
 
     std::string header = generateHeader(res);
-    std::cout << header;
 
     conn.sendBuffer.append(header);
     conn.sendBuffer.append(body);
