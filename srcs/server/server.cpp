@@ -48,6 +48,21 @@ static bool requestComplete(const Buffer& buf, size_t& endPos) {
     return false;
 }
 
+static int checkRequest(const Request& request, const LocationConfig& location) {
+	if (location.methods.empty()) {
+        return OK;
+	}
+
+    for (std::vector<std::string>::const_iterator it = location.methods.begin();
+         it != location.methods.end();
+         ++it) {
+        if (*it == request.method) {
+            return OK;
+        }
+    }
+    return METHOD_NOT_ALLOWED;
+}
+
 void Server::handleClient(epoll_event& event) {
     int fd = event.data.fd;
 	Connection& conn = connections_[fd];
@@ -57,6 +72,9 @@ void Server::handleClient(epoll_event& event) {
 	} else if (event.events & EPOLLOUT) {
         return handleWrite(conn);
 	}
+
+    if (conn.closed)
+        return;
 
     if (conn.state == READING_HEADERS) {
         size_t endPos;
@@ -68,10 +86,30 @@ void Server::handleClient(epoll_event& event) {
 
         parser_.parse(raw);
         conn.req = parser_.getRequest();
+
+
+        // ============  From handleRequest ==================
+        std::string path = conn.req.path;
+        LocationConfig location = resolveLocation(path);
+
+        int status = checkRequest(conn.req, location);
+        if (status != OK) {
+            return sendError(status, conn);
+        }
+
+        if (location.redirectCode != 0) {
+            return sendRedirect(conn, location);
+        }
+
+        status = resolvePath(path, location);
+
+        if (status == DIRECTORY_NO_INDEX && location.autoindex) {
+            return generateAutoindex(conn, location);
+        } else if (status != OK) {
+            return sendError(status, conn);
+        }
+        // =====================================================
 		
-
-		// TODO: check for resource 
-
         if (conn.req.method == "GET" || conn.req.method == "DELETE") {
         	conn.state = PROCESSING;
             conn.recvBuffer.consume(endPos);

@@ -25,10 +25,10 @@ void Server::handleWrite(Connection& conn) {
                          0);
         if (n > 0) {
             conn.sendBuffer.consume(n);
-        } else {
-            if (errno == EAGAIN || errno == EWOULDBLOCK)
-                break;
+        } else if (n == 0) {
             return closeConnection(conn.fd);
+        } else {
+            break;
         }
     }
     
@@ -37,7 +37,7 @@ void Server::handleWrite(Connection& conn) {
     }
 
     if (conn.closed) {
-        closeConnection(conn.fd);
+        return closeConnection(conn.fd);
     }
 
     if (conn.sendBuffer.empty()) {
