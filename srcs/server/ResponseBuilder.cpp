@@ -42,7 +42,7 @@ bool Server::prepareFileResponse(Connection& conn, const std::string& path) {
 
     conn.fileFd = fd;
     conn.sendingFile = true;
-
+    conn.closed = true;
     return true;
 }
 
@@ -61,6 +61,7 @@ bool Server::streamFileChunk(Connection& conn) {
     close(conn.fileFd);
     conn.fileFd = -1;
     conn.sendingFile = false;
+    conn.closed = true;
     return false;
 }
 
