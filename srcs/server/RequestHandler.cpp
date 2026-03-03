@@ -3,21 +3,6 @@
 #include "webserv.h"
 #include "ConfigParser.h"
 
-static int checkRequest(const Request& request, const LocationConfig& location) {
-	if (location.methods.empty()) {
-        return OK;
-	}
-
-    for (std::vector<std::string>::const_iterator it = location.methods.begin();
-         it != location.methods.end();
-         ++it) {
-        if (*it == request.method) {
-            return OK;
-        }
-    }
-    return METHOD_NOT_ALLOWED;
-}
-
 int deleteResource(const std::string& path) {
     if (access(path.c_str(), W_OK) != 0)
         return FORBIDDEN;
@@ -35,29 +20,13 @@ void Server::handleRequest(Connection& conn) {
     log(INFO, req.version + " " + req.method + " " + req.uri);
     
     LocationConfig location = resolveLocation(req.path);
+    resolvePath(req.path, location);
 
-    int status = checkRequest(req, location);
-    if (status != OK) {
-        return sendError(status, conn);
-    }
-
-    if (location.redirectCode != 0) {
-        return sendRedirect(conn, location);
-    }
-
-    status = resolvePath(req.path, location);
-
-    if (status == DIRECTORY_NO_INDEX && location.autoindex) {
-        return generateAutoindex(conn, location);
-    } else if (status != OK) {
-        return sendError(status, conn);
-    }
-
+    std::cout << req.path << std::endl;
     res.path = req.path;
 	
 	if (req.method == "DELETE") {
-		status = deleteResource(req.path);
-		return sendError(status, conn);
+		return sendError(deleteResource(req.path), conn);
 	}
 	
 	std::string cgiPath = findCGI(req.path, location.cgi);
@@ -89,7 +58,6 @@ void Server::handleRequest(Connection& conn) {
                         safeName = safeName.substr(slash + 1);
 
                     std::string fullPath = uploadDir + "/" + safeName;
-                    std::cout << fullPath << std::endl;
 
                     int fd = open(fullPath.c_str(),
                                   O_WRONLY | O_CREAT | O_TRUNC,

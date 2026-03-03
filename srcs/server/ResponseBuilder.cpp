@@ -42,7 +42,6 @@ bool Server::prepareFileResponse(Connection& conn, const std::string& path) {
 
     conn.fileFd = fd;
     conn.sendingFile = true;
-    conn.closed = true;
     return true;
 }
 
