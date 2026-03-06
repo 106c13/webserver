@@ -83,7 +83,7 @@ void Server::generateAutoindex(Connection& conn, LocationConfig& location)
     std::string header = generateHeader(res);
     conn.sendBuffer.append(header);
     conn.sendBuffer.append(page);
-    conn.state = CLOSED;
+    conn.state = SENDING_RESPONSE;
 
 	log(INFO, header.substr(0, header.find("\n")));
 

@@ -76,6 +76,8 @@ void Server::handleClient(epoll_event& event) {
     if (event.events & EPOLLOUT)
         handleWrite(conn);
 
+    if (conn.state == CLOSED)
+        return closeConnection(conn.fd);
 
     if (conn.state == READING_HEADERS)
         processHeaders(conn);
@@ -227,7 +229,6 @@ void Server::acceptConnection() {
 		conn.fd = clientFd;
         conn.sendingFile = false;
         conn.remainingBody = 0;
-        conn.closed = false;
         conn.state = READING_HEADERS;
 
         std::cout << "New connection..." << std::endl;

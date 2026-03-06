@@ -172,7 +172,7 @@ void Server::sendError(int code, Connection& conn) {
 
     conn.sendBuffer.append(header);
     conn.sendBuffer.append(page, pageSize);
-	conn.state = CLOSED;
+	conn.state = SENDING_RESPONSE;
 
 	log(INFO, header.substr(0, header.find("\n")));
 
