@@ -10,17 +10,24 @@ static std::string getStatus(int code) {
         return "204 No Content";
     } else if (code == REDIRECT) {
         return "301 Moved Permanently";
+    } else if (code == TEMPRORARY_REDIRECT) {
+        return "302 Temporary Redirect";
     } else if (code == BAD_REQUEST) {
         return "400 Bad Request";
     } else if (code == FORBIDDEN) {
         return "403 Forbidden";
     } else if (code == NOT_FOUND) {
         return "404 Not Found";
-    } else if (code == SERVER_ERROR) {
-        return "500 Internal Server Error";
-    } else {
-        return "500 Internal Server Error";
+    } else if (code == METHOD_NOT_ALLOWED) {
+        return "405 Method Not Allowed";
+    } else if (code == LENGTH_REQUIRED) {
+        return "411 Length Required";
+    } else if (code == PAYLOAD_TOO_LARGE) {
+        return "413 Content Too Large";
+    } else if (code == SERVICE_UNAVAILABLE) {
+        return "503 Service Unavailable";
     }
+    return "500 Internal Server Error";
 }
 
 static std::string resolveContentType(const std::string& ext) {

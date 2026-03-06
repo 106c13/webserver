@@ -51,6 +51,7 @@ bool Server::streamFileChunk(Connection& conn) {
 
     char buf[4096];
     ssize_t n = read(conn.fileFd, buf, sizeof(buf));
+    buf[n] = 0;
 
     if (n > 0) {
         conn.sendBuffer.append(buf, n);
@@ -60,7 +61,7 @@ bool Server::streamFileChunk(Connection& conn) {
     close(conn.fileFd);
     conn.fileFd = -1;
     conn.sendingFile = false;
-    conn.closed = true;
+    conn.state = CLOSED;
     return false;
 }
 
