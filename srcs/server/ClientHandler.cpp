@@ -8,7 +8,7 @@ void Server::handleRead(Connection& conn) {
     while (true) {
         ssize_t n = recv(conn.fd, buf, sizeof(buf), 0);
 
-        if (n > 0 && !conn.closed)
+        if (n > 0)
             conn.recvBuffer.append(buf, n);
         else if (n == 0)
             return closeConnection(conn.fd);
@@ -30,6 +30,13 @@ void Server::handleWrite(Connection& conn) {
             return closeConnection(conn.fd);
         } else {
             break;
+        }
+    }
+
+    if (conn.state == SENDING_RESPONSE) {
+        if (conn.sendBuffer.empty() && !conn.sendingFile) {
+            conn.state = CLOSED;
+            return;
         }
     }
     

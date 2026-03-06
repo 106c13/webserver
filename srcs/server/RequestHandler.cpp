@@ -17,13 +17,10 @@ int deleteResource(const std::string& path) {
 void Server::handleRequest(Connection& conn) {
     Request& req = conn.req;
     Response& res = conn.res;
-    log(INFO, req.version + " " + req.method + " " + req.uri);
-
     
     LocationConfig location = resolveLocation(req.path);
     resolvePath(req.path, location);
 
-    std::cout << req.path << std::endl;
     res.path = req.path;
 	
 	if (req.method == "DELETE") {

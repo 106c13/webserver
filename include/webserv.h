@@ -22,7 +22,7 @@ enum ConnState {
 	READING_HEADERS = 64,
 	READING_BODY = 63,
 	PROCESSING = 62,
-	WRITING_RESPONSE = 61,
+	SENDING_RESPONSE = 61,
 	CLOSED = 60
 };
 
@@ -42,8 +42,6 @@ struct Connection {
 	
 	size_t		remainingBody;
 	int			state;
-	
-	bool		closed;
 };
 
 
