@@ -134,12 +134,15 @@ void Server::handleClient(Event& event) {
         handleRead(conn);
     }
 
+<<<<<<< HEAD
     if (event.filter & EVFILT_WRITE) {
         conn.lastActivityTime = std::time(NULL);
         handleWrite(conn);
     }
 #endif
 
+=======
+>>>>>>> 198e8ce (feat: add time for log)
     if (conn.state == CLOSED)
         return closeConnection(conn.fd);
 
