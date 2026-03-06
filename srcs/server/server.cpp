@@ -45,6 +45,7 @@ static bool requestComplete(const Buffer& buf, size_t& endPos) {
             return true;
         }
     }
+    endPos = -1;
     return false;
 }
 
@@ -63,95 +64,146 @@ static int checkRequest(const Request& request, const LocationConfig& location) 
     return METHOD_NOT_ALLOWED;
 }
 
+// ==================================
+
 void Server::handleClient(epoll_event& event) {
     int fd = event.data.fd;
-	Connection& conn = connections_[fd];
+    Connection& conn = connections_[fd];
 
-	if (event.events & EPOLLIN) {
+    if (event.events & EPOLLIN)
         handleRead(conn);
-	} else if (event.events & EPOLLOUT) {
-        return handleWrite(conn);
-	}
 
-    if (conn.closed)
+    if (event.events & EPOLLOUT)
+        handleWrite(conn);
+
+
+    if (conn.state == READING_HEADERS)
+        processHeaders(conn);
+
+    if (conn.state == READING_BODY)
+        processBody(conn);
+}
+
+void Server::processHeaders(Connection& conn) {
+    size_t endPos;
+
+    if (!requestComplete(conn.recvBuffer, endPos)) {
+        if (conn.recvBuffer.size() > MAX_HEADER_SIZE)
+            return sendError(BAD_REQUEST, conn);
+        return;
+    }
+
+    if (endPos > MAX_HEADER_SIZE)
+        return sendError(BAD_REQUEST, conn);
+
+    std::string raw(conn.recvBuffer.data(), endPos);
+
+    parser_.parse(raw);
+    conn.req = parser_.getRequest();
+
+    log(INFO, conn.req.version + " " + conn.req.method + " " + conn.req.uri);
+
+    if (!validateRequest(conn))
         return;
 
-    if (conn.state == READING_HEADERS) {
-        size_t endPos;
+    if (conn.req.method == "GET" || conn.req.method == "DELETE")
+        return handleSimpleRequest(conn, endPos);
 
-        if (!requestComplete(conn.recvBuffer, endPos))
-            return;
+    if (conn.req.method == "POST")
+        return startBodyReading(conn, endPos);
 
-        std::string raw(conn.recvBuffer.data(), endPos);
-
-        parser_.parse(raw);
-        conn.req = parser_.getRequest();
-
-
-        // ============  From handleRequest ==================
-        std::string path = conn.req.path;
-        LocationConfig location = resolveLocation(path);
-
-        int status = checkRequest(conn.req, location);
-        if (status != OK) {
-            return sendError(status, conn);
-        }
-
-        if (location.redirectCode != 0) {
-            return sendRedirect(conn, location);
-        }
-
-        status = resolvePath(path, location);
-
-        if (status == DIRECTORY_NO_INDEX && location.autoindex) {
-            return generateAutoindex(conn, location);
-        } else if (status != OK) {
-            return sendError(status, conn);
-        }
-        // =====================================================
-		
-        if (conn.req.method == "GET" || conn.req.method == "DELETE") {
-        	conn.state = PROCESSING;
-            conn.recvBuffer.consume(endPos);
-            handleRequest(conn);
-        } else if (conn.req.method == "POST") {
-            StringMap::iterator it = conn.req.headers.find("Content-Length");
-            if (it == conn.req.headers.end())
-                return sendError(BAD_REQUEST, conn);
-            conn.req.body.append(raw);
-            conn.recvBuffer.consume(endPos);
-            conn.remainingBody = std::strtoul(it->second.c_str(), NULL, 10);
-
-            //if (conn.remainingBody > conn.configMaxBodySize)
-            //    return sendError(PAYLOAD_TOO_LARGE, conn);
-
-            conn.state = READING_BODY;
-        } else {
-            return sendError(METHOD_NOT_ALLOWED, conn);
-        }
-    }
-
-    if (conn.state == READING_BODY) {
-        size_t available = conn.recvBuffer.size();
-
-        if (available == 0)
-            return;
-
-        size_t toConsume = std::min(available, conn.remainingBody);
-
-        conn.req.body.append(conn.recvBuffer.data(), toConsume);
-
-        conn.recvBuffer.consume(toConsume);
-        conn.remainingBody -= toConsume;
-
-        if (conn.remainingBody == 0) {
-            conn.state = PROCESSING;
-            parser_.parse(conn.req.body);
-            conn.req = parser_.getRequest();
-            handleRequest(conn);
-        }
-    }
+    return sendError(METHOD_NOT_ALLOWED, conn);
 }
+
+bool Server::validateRequest(Connection& conn) {
+    std::string path = conn.req.path;
+
+    LocationConfig location = resolveLocation(path);
+
+    int status = checkRequest(conn.req, location);
+    if (status != OK) {
+        sendError(status, conn);
+        return false;
+    }
+
+    if (location.redirectCode != 0) {
+        sendRedirect(conn, location);
+        return false;
+    }
+
+    status = resolvePath(path, location);
+
+    if (status == DIRECTORY_NO_INDEX && location.autoindex) {
+        generateAutoindex(conn, location);
+        return false;
+    }
+
+    if (status != OK) {
+        conn.state = PROCESSING;
+        sendError(status, conn);
+        return false;
+    }
+
+    return true;
+}
+
+void Server::handleSimpleRequest(Connection& conn, size_t endPos) {
+    conn.state = PROCESSING;
+
+    conn.recvBuffer.consume(endPos);
+
+    handleRequest(conn);
+}
+
+void Server::startBodyReading(Connection& conn, size_t endPos) {
+    StringMap::iterator it = conn.req.headers.find("Content-Length");
+
+    if (it == conn.req.headers.end())
+        return sendError(BAD_REQUEST, conn);
+
+    conn.req.body.append(conn.recvBuffer.data(), endPos);
+    conn.recvBuffer.consume(endPos);
+
+    conn.remainingBody = std::strtoul(it->second.c_str(), NULL, 10);
+
+    LocationConfig location = resolveLocation(conn.req.path);
+
+    if (location.hasClientMaxBodySize &&
+        conn.remainingBody > location.clientMaxBodySize)
+    {
+        return sendError(PAYLOAD_TOO_LARGE, conn);
+    }
+
+    conn.state = READING_BODY;
+}
+
+void Server::processBody(Connection& conn) {
+    size_t available = conn.recvBuffer.size();
+
+    if (available == 0)
+        return;
+
+    size_t toConsume = std::min(available, conn.remainingBody);
+
+    conn.req.body.append(conn.recvBuffer.data(), toConsume);
+
+    conn.recvBuffer.consume(toConsume);
+    conn.remainingBody -= toConsume;
+
+    if (conn.remainingBody == 0)
+        finishBody(conn);
+}
+
+void Server::finishBody(Connection& conn) {
+    conn.state = PROCESSING;
+
+    parser_.parse(conn.req.body);
+    conn.req = parser_.getRequest();
+
+    handleRequest(conn);
+}
+//====================================================
+
 
 void Server::acceptConnection() {
     sockaddr_in addr;

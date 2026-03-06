@@ -8,12 +8,13 @@ void Server::handleRead(Connection& conn) {
     while (true) {
         ssize_t n = recv(conn.fd, buf, sizeof(buf), 0);
 
-        if (n > 0)
+        if (n > 0 && !conn.closed)
             conn.recvBuffer.append(buf, n);
         else if (n == 0)
             return closeConnection(conn.fd);
         else
             break;
+        break;
     }
 }
 
@@ -34,10 +35,6 @@ void Server::handleWrite(Connection& conn) {
     
     if (conn.sendingFile) {
         streamFileChunk(conn);
-    }
-
-    if (conn.closed) {
-        return closeConnection(conn.fd);
     }
 
     if (conn.sendBuffer.empty()) {

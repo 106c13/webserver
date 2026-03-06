@@ -22,7 +22,8 @@ enum ConnState {
 	READING_HEADERS = 64,
 	READING_BODY = 63,
 	PROCESSING = 62,
-	WRITING_RESPONSE = 61
+	WRITING_RESPONSE = 61,
+	CLOSED = 60
 };
 
 struct Connection {
@@ -85,6 +86,13 @@ class	Server {
 		bool			streamFileChunk(Connection& conn);
 		void			sendError(int code, Connection& conn);
 		char**			createEnvironment(const Request& req);
+		
+		void			finishBody(Connection& conn);
+		void			processBody(Connection& conn);
+		void			startBodyReading(Connection& conn, size_t endPos);
+		void			handleSimpleRequest(Connection& conn, size_t endPos);
+		bool			validateRequest(Connection& conn);
+		void			processHeaders(Connection& conn);
 
 	public:
 		Server(const ServerConfig& config); // Start server with configurations from file

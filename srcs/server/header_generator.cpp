@@ -21,6 +21,8 @@ static std::string getStatus(int code) {
         return "405 Method Not Allowed";
     } else if (code == LENGTH_REQUIRED) {
         return "411 Length Required";
+    } else if (code == PAYLOAD_TOO_LARGE) {
+        return "413 Content Too Large";
     } else if (code == SERVICE_UNAVAILABLE) {
         return "503 Service Unavailable";
     }
