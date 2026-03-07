@@ -26,7 +26,7 @@ void Server::handleRequest(Connection& conn) {
 	if (req.method == "DELETE") {
 		return sendError(deleteResource(req.path), conn);
 	}
-	
+
 	std::string cgiPath = findCGI(req.path, location.cgi);
 
 	if (!cgiPath.empty()) {

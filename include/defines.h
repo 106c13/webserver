@@ -10,7 +10,10 @@ typedef std::map<std::string, std::string> StringMap;
 #define COLOR_RED "\033[1;31m"
 #define COLOR_YELLOW "\033[1;33m"
 #define COLOR_RESET "\033[0m"
+
 #define MAX_HEADER_SIZE 8000
+#define HEADER_TIMEOUT 10
+#define BODY_TIMEOUT 30
 
 enum Log {
 	INFO = 10,

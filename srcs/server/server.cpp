@@ -1,12 +1,33 @@
 #include <unistd.h>  
 #include <fcntl.h>
 #include <sys/socket.h>
+#include <ctime>
 #include <iostream>
 #include <exception>
 #include <cstring>
 #include <sstream>
 #include "webserv.h"
 #include "ConfigParser.h"
+
+void Server::checkTimeOuts() {
+    for (std::map<int, Connection>::iterator it = connections_.begin(); 
+         it != connections_.end(); )
+    {
+        Connection& conn = it->second;
+
+        size_t diff = std::time(NULL) - conn.lastActivityTime;
+
+        if ((conn.state == READING_HEADERS && diff > HEADER_TIMEOUT) ||
+            (conn.state == READING_BODY && diff > BODY_TIMEOUT)) 
+        {
+            sendError(NOT_FOUND, conn);
+
+            std::map<int, Connection>::iterator toErase = it++;
+            closeConnection(toErase->first);
+        } else
+            ++it;
+    }
+}
 
 void Server::modifyToWrite(int fd) {
     epoll_event ev;
@@ -70,11 +91,15 @@ void Server::handleClient(epoll_event& event) {
     int fd = event.data.fd;
     Connection& conn = connections_[fd];
 
-    if (event.events & EPOLLIN)
+    if (event.events & EPOLLIN) {
+        conn.lastActivityTime = std::time(NULL);
         handleRead(conn);
+    }
 
-    if (event.events & EPOLLOUT)
+    if (event.events & EPOLLOUT) {
+        conn.lastActivityTime = std::time(NULL);
         handleWrite(conn);
+    }
 
     if (conn.state == CLOSED)
         return closeConnection(conn.fd);
@@ -230,6 +255,7 @@ void Server::acceptConnection() {
         conn.sendingFile = false;
         conn.remainingBody = 0;
         conn.state = READING_HEADERS;
+        conn.lastActivityTime = std::time(NULL);
 
         std::cout << "New connection..." << std::endl;
     }
@@ -276,7 +302,8 @@ void Server::loop() {
     epoll_event events[1024];
 
     while (true) {
-        int evCount = epoll_wait(epollFd_, events, 1024, -1);
+        checkTimeOuts();
+        int evCount = epoll_wait(epollFd_, events, 1024, 1000);
         if (evCount < 0)
             continue;
 
@@ -290,6 +317,7 @@ void Server::loop() {
                 handleClient(ev);
             }
         }
+
     }
 }
 
