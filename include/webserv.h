@@ -11,6 +11,7 @@
 #include <dirent.h>
 #include <cstddef>
 #include <cstring> 
+#include <ctime>
 #include "ConfigParser.h"
 #include "RequestParser.h"
 #include "HeaderGenerator.h"
@@ -23,7 +24,8 @@ enum ConnState {
 	READING_BODY = 63,
 	PROCESSING = 62,
 	SENDING_RESPONSE = 61,
-	CLOSED = 60
+	DRAINING_BODY = 60,
+	CLOSED = 59
 };
 
 struct Connection {
@@ -35,13 +37,13 @@ struct Connection {
     Request		req;
     Response	res;
 
-	bool		writable;	
-
 	int			fileFd;
 	bool		sendingFile;
 	
 	size_t		remainingBody;
 	int			state;
+
+	time_t		lastActivityTime;
 };
 
 
@@ -91,6 +93,7 @@ class	Server {
 		void			handleSimpleRequest(Connection& conn, size_t endPos);
 		bool			validateRequest(Connection& conn);
 		void			processHeaders(Connection& conn);
+		void			checkTimeOuts();
 
 	public:
 		Server(const ServerConfig& config); // Start server with configurations from file
