@@ -1,6 +1,7 @@
 #include "HeaderGenerator.h"
 #include "webserv.h"
 #include "defines.h"
+#include <map>
 
 static std::string getStatus(int code) {
     if (code == OK) {
@@ -30,18 +31,79 @@ static std::string getStatus(int code) {
 }
 
 static std::string resolveContentType(const std::string& ext) {
-    if (ext == "css") {
-        return "text/css";
-    } else if (ext == "js") {
-        return "text/javascript";
-    } else if (ext == "png") {
-        return "image/png";
-    } else if (ext == "jpg" || ext == "jpeg") {
-        return "image/jpeg";
-    } else if (ext == "gif") {
-        return "image/gif";
-    } else if (ext == "html") {
-        return "text/html";
+    static std::map<std::string, std::string> mimeTypes;
+
+    if (mimeTypes.empty()) {
+        // Text types
+        mimeTypes["html"] = "text/html";
+        mimeTypes["htm"] = "text/html";
+        mimeTypes["css"] = "text/css";
+        mimeTypes["js"] = "text/javascript";
+        mimeTypes["txt"] = "text/plain";
+        mimeTypes["xml"] = "text/xml";
+        mimeTypes["json"] = "application/json";
+        mimeTypes["csv"] = "text/csv";
+
+        // Document types
+        mimeTypes["pdf"] = "application/pdf";
+        mimeTypes["doc"] = "application/msword";
+        mimeTypes["docx"] = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        mimeTypes["xls"] = "application/vnd.ms-excel";
+        mimeTypes["xlsx"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+        // Image types
+        mimeTypes["png"] = "image/png";
+        mimeTypes["jpg"] = "image/jpeg";
+        mimeTypes["jpeg"] = "image/jpeg";
+        mimeTypes["gif"] = "image/gif";
+        mimeTypes["svg"] = "image/svg+xml";
+        mimeTypes["ico"] = "image/x-icon";
+        mimeTypes["webp"] = "image/webp";
+        mimeTypes["bmp"] = "image/bmp";
+        mimeTypes["tiff"] = "image/tiff";
+        mimeTypes["tif"] = "image/tiff";
+
+        // Font types
+        mimeTypes["woff"] = "font/woff";
+        mimeTypes["woff2"] = "font/woff2";
+        mimeTypes["ttf"] = "font/ttf";
+        mimeTypes["otf"] = "font/otf";
+        mimeTypes["eot"] = "application/vnd.ms-fontobject";
+
+        // Audio types
+        mimeTypes["mp3"] = "audio/mpeg";
+        mimeTypes["wav"] = "audio/wav";
+        mimeTypes["ogg"] = "audio/ogg";
+        mimeTypes["m4a"] = "audio/mp4";
+        mimeTypes["flac"] = "audio/flac";
+
+        // Video types
+        mimeTypes["mp4"] = "video/mp4";
+        mimeTypes["webm"] = "video/webm";
+        mimeTypes["avi"] = "video/x-msvideo";
+        mimeTypes["mov"] = "video/quicktime";
+        mimeTypes["mkv"] = "video/x-matroska";
+        mimeTypes["mpeg"] = "video/mpeg";
+        mimeTypes["mpg"] = "video/mpeg";
+
+        // Archive types
+        mimeTypes["zip"] = "application/zip";
+        mimeTypes["gz"] = "application/gzip";
+        mimeTypes["gzip"] = "application/gzip";
+        mimeTypes["tar"] = "application/x-tar";
+        mimeTypes["rar"] = "application/vnd.rar";
+        mimeTypes["7z"] = "application/x-7z-compressed";
+
+        // Other common types
+        mimeTypes["sh"] = "application/x-sh";
+        mimeTypes["jar"] = "application/java-archive";
+        mimeTypes["swf"] = "application/x-shockwave-flash";
+        mimeTypes["wasm"] = "application/wasm";
+    }
+
+    std::map<std::string, std::string>::const_iterator it = mimeTypes.find(ext);
+    if (it != mimeTypes.end()) {
+        return it->second;
     }
     return "application/octet-stream";
 }

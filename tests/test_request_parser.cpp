@@ -598,9 +598,7 @@ static void test_response_content_disposition(void) {
 	res.contentLength = "12345";
 	res.contentDisposition = "attachment; filename=\"report.pdf\"";
 
-	char* header = generateHeader(res);
-	std::string headerStr(header);
-	delete[] header;
+	std::string headerStr = generateHeader(res);
 
 	test_assert(headerStr.find("Content-Disposition: attachment; filename=\"report.pdf\"") != std::string::npos,
 		"response_disposition: header contains Content-Disposition");
@@ -617,9 +615,7 @@ static void test_response_no_disposition(void) {
 	res.contentType = "text/html";
 	res.contentLength = "100";
 
-	char* header = generateHeader(res);
-	std::string headerStr(header);
-	delete[] header;
+	std::string headerStr = generateHeader(res);
 
 	test_assert(headerStr.find("Content-Disposition") == std::string::npos,
 		"response_no_disposition: no Content-Disposition when empty");
@@ -633,12 +629,301 @@ static void test_response_inline_disposition(void) {
 	res.contentLength = "5000";
 	res.contentDisposition = "inline; filename=\"preview.pdf\"";
 
-	char* header = generateHeader(res);
-	std::string headerStr(header);
-	delete[] header;
+	std::string headerStr = generateHeader(res);
 
 	test_assert(headerStr.find("Content-Disposition: inline; filename=\"preview.pdf\"") != std::string::npos,
 		"response_inline: inline disposition works");
+}
+
+/* ============================================ */
+/* Malformed Request Tests (Segfault Prevention) */
+/* ============================================ */
+
+/* Test 36: Garbage request line (like the reported segfault case) */
+static void test_malformed_garbage_request_line(void) {
+	const char *raw =
+		"0000XvQ[0vh/6\r\n"
+		"Host: 127.0.0.1:8080\r\n"
+		"User-Agent: Go-http-client/1.1\r\n"
+		"Transfer-Encoding: chunked\r\n"
+		"Content-Type: test/file\r\n"
+		"Accept-Encoding: gzip\r\n"
+		"\r\n";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.method.empty() || !req.method.empty(),
+		"malformed_garbage_line: parser does not crash");
+}
+
+/* Test 37: Empty request */
+static void test_malformed_empty_request(void) {
+	const char *raw = "";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.method.empty(), "malformed_empty: method is empty");
+	test_assert(req.body.empty(), "malformed_empty: body is empty");
+}
+
+/* Test 38: Only CRLF */
+static void test_malformed_only_crlf(void) {
+	const char *raw = "\r\n\r\n";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.method.empty(), "malformed_only_crlf: no crash, method empty");
+}
+
+/* Test 39: Non-printable characters in request line */
+static void test_malformed_non_printable_chars(void) {
+	const char raw[] = "\x01\x02\x03 \x04\x05 \x06\x07\x08\r\n"
+		"Host: localhost\r\n"
+		"\r\n";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(!req.method.empty(), "malformed_non_printable: method parsed (garbage)");
+}
+
+/* Test 40: Null bytes in request */
+static void test_malformed_null_bytes(void) {
+	std::string raw = "GET /path HTTP/1.1\r\n";
+	raw += "Host: local";
+	raw += '\0';
+	raw += "host\r\n\r\n";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.method == "GET", "malformed_null_bytes: method parsed correctly");
+}
+
+/* Test 41: Truncated request (no CRLF at end) */
+static void test_malformed_truncated_no_crlf(void) {
+	const char *raw = "GET /index.html HTTP/1.1\r\nHost: localhost";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.method == "GET", "malformed_truncated: method parsed");
+	test_assert(req.headers.count("Host") == 1, "malformed_truncated: host header exists");
+}
+
+/* Test 42: Header with no value (just colon) */
+static void test_malformed_header_colon_only(void) {
+	const char *raw =
+		"GET / HTTP/1.1\r\n"
+		"Host:\r\n"
+		"Empty-Header:\r\n"
+		"\r\n";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.headers.at("Host") == "", "malformed_colon_only: empty host value");
+}
+
+/* Test 43: Header with no colon */
+static void test_malformed_header_no_colon(void) {
+	const char *raw =
+		"GET / HTTP/1.1\r\n"
+		"InvalidHeaderNoColon\r\n"
+		"Host: localhost\r\n"
+		"\r\n";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.headers.at("Host") == "localhost", "malformed_no_colon: valid header parsed");
+}
+
+/* Test 44: Multipart with empty boundary */
+static void test_malformed_multipart_empty_boundary(void) {
+	const char *raw =
+		"POST /upload HTTP/1.1\r\n"
+		"Host: localhost\r\n"
+		"Content-Type: multipart/form-data; boundary=\r\n"
+		"\r\n"
+		"some body content";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.boundary.empty(), "malformed_empty_boundary: boundary is empty");
+	test_assert(req.multipartParts.empty(), "malformed_empty_boundary: no parts parsed");
+}
+
+/* Test 45: Multipart with truncated body */
+static void test_malformed_multipart_truncated(void) {
+	const char *raw =
+		"POST /upload HTTP/1.1\r\n"
+		"Host: localhost\r\n"
+		"Content-Type: multipart/form-data; boundary=----bound\r\n"
+		"\r\n"
+		"------bound\r\n"
+		"Content-Disposition: form-data; name=\"field\"\r\n";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.boundary == "----bound", "malformed_truncated_multipart: boundary parsed");
+}
+
+/* Test 46: Multipart body starting immediately with boundary (pos=0 edge case) */
+static void test_malformed_multipart_boundary_at_start(void) {
+	const char *raw =
+		"POST /upload HTTP/1.1\r\n"
+		"Host: localhost\r\n"
+		"Content-Type: multipart/form-data; boundary=bound\r\n"
+		"\r\n"
+		"--bound\r\n"
+		"\r\n"
+		"--bound--";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.boundary == "bound", "malformed_boundary_start: no crash");
+}
+
+/* Test 47: Binary garbage as entire request */
+static void test_malformed_binary_garbage(void) {
+	const char raw[] = "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00";
+
+	RequestParser parser;
+	parser.parse(std::string(raw, sizeof(raw) - 1));
+	const Request& req = parser.getRequest();
+
+	test_assert(true, "malformed_binary_garbage: no crash");
+	(void)req;
+}
+
+/* Test 48: Very long line without CRLF */
+static void test_malformed_very_long_line(void) {
+	std::string raw = "GET /";
+	raw += std::string(10000, 'A');
+	raw += " HTTP/1.1\r\n\r\n";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.method == "GET", "malformed_long_line: method parsed");
+	test_assert(req.uri.size() > 1000, "malformed_long_line: long uri parsed");
+}
+
+/* Test 49: Request line with only method (no space) */
+static void test_malformed_method_only(void) {
+	const char *raw = "GET\r\n\r\n";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.method.empty(), "malformed_method_only: method empty (no space)");
+}
+
+/* Test 50: Multipart with malformed Content-Disposition (no quotes) */
+static void test_malformed_content_disposition(void) {
+	const char *raw =
+		"POST /upload HTTP/1.1\r\n"
+		"Host: localhost\r\n"
+		"Content-Type: multipart/form-data; boundary=----bound\r\n"
+		"\r\n"
+		"------bound\r\n"
+		"Content-Disposition: form-data; name=field\r\n"
+		"\r\n"
+		"value\r\n"
+		"------bound--\r\n";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.multipartParts.size() == 1, "malformed_disposition: one part parsed");
+}
+
+/* Test 51: Control characters in header values */
+static void test_malformed_control_chars_header(void) {
+	const char raw[] =
+		"GET / HTTP/1.1\r\n"
+		"Host: local\x01\x02\x03host\r\n"
+		"\r\n";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.headers.count("Host") == 1, "malformed_control_header: header exists");
+}
+
+/* Test 52: Multipart with only boundary markers, no content */
+static void test_malformed_multipart_only_boundaries(void) {
+	const char *raw =
+		"POST /upload HTTP/1.1\r\n"
+		"Host: localhost\r\n"
+		"Content-Type: multipart/form-data; boundary=b\r\n"
+		"\r\n"
+		"--b\r\n"
+		"--b--";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.boundary == "b", "malformed_only_boundaries: boundary parsed");
+}
+
+/* Test 53: Mixed CRLF and LF in multipart */
+static void test_malformed_multipart_mixed_lineendings(void) {
+	const char *raw =
+		"POST /upload HTTP/1.1\r\n"
+		"Host: localhost\r\n"
+		"Content-Type: multipart/form-data; boundary=----bound\r\n"
+		"\r\n"
+		"------bound\n"
+		"Content-Disposition: form-data; name=\"field\"\n"
+		"\n"
+		"value\n"
+		"------bound--\n";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(req.multipartParts.size() >= 1 || req.multipartParts.empty(),
+		"malformed_mixed_lineendings: no crash");
+}
+
+/* Test 54: Request with body but no Content-Length or Transfer-Encoding */
+static void test_malformed_body_no_length(void) {
+	const char *raw =
+		"POST /submit HTTP/1.1\r\n"
+		"Host: localhost\r\n"
+		"\r\n"
+		"This is some body data without Content-Length";
+
+	RequestParser parser;
+	parser.parse(raw);
+	const Request& req = parser.getRequest();
+
+	test_assert(!req.body.empty(), "malformed_body_no_length: body parsed");
 }
 
 int main(void) {
@@ -680,6 +965,30 @@ int main(void) {
 	test_response_content_disposition();
 	test_response_no_disposition();
 	test_response_inline_disposition();
+
+	std::cout << std::endl;
+	std::cout << "=== Malformed Request Tests ===" << std::endl;
+	std::cout << std::endl;
+
+	test_malformed_garbage_request_line();
+	test_malformed_empty_request();
+	test_malformed_only_crlf();
+	test_malformed_non_printable_chars();
+	test_malformed_null_bytes();
+	test_malformed_truncated_no_crlf();
+	test_malformed_header_colon_only();
+	test_malformed_header_no_colon();
+	test_malformed_multipart_empty_boundary();
+	test_malformed_multipart_truncated();
+	test_malformed_multipart_boundary_at_start();
+	test_malformed_binary_garbage();
+	test_malformed_very_long_line();
+	test_malformed_method_only();
+	test_malformed_content_disposition();
+	test_malformed_control_chars_header();
+	test_malformed_multipart_only_boundaries();
+	test_malformed_multipart_mixed_lineendings();
+	test_malformed_body_no_length();
 
 	std::cout << std::endl;
 	std::cout << "=== Results ===" << std::endl;
