@@ -33,13 +33,6 @@ void Server::handleWrite(Connection& conn) {
         }
     }
 
-    if (conn.state == SENDING_RESPONSE) {
-        if (conn.sendBuffer.empty() && !conn.sendingFile) {
-            conn.state = CLOSED;
-            return;
-        }
-    }
-    
     if (conn.sendingFile) {
         streamFileChunk(conn);
     }
@@ -47,5 +40,4 @@ void Server::handleWrite(Connection& conn) {
     if (conn.sendBuffer.empty()) {
         modifyToRead(conn.fd);
     }
-
 }

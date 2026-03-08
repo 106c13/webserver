@@ -1,4 +1,3 @@
-#include <sys/epoll.h>
 #include <fcntl.h>
 #include <string>
 #include "webserv.h"
@@ -51,7 +50,6 @@ bool Server::streamFileChunk(Connection& conn) {
 
     char buf[4096];
     ssize_t n = read(conn.fileFd, buf, sizeof(buf));
-    buf[n] = 0;
 
     if (n > 0) {
         conn.sendBuffer.append(buf, n);
