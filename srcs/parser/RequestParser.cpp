@@ -417,7 +417,7 @@ void RequestParser::parseMultipart() {
 			std::string line = _request.body.substr(pos, lineEnd - pos);
 			if (line.empty() || line == "\r") {
 				pos = lineEnd + 1;
-				if (pos < bodyLen && _request.body[pos - 1] == '\r') {
+				if (pos > 0 && pos < bodyLen && _request.body[pos - 1] == '\r') {
 					pos++;
 				}
 				break;
@@ -453,7 +453,7 @@ void RequestParser::parseMultipart() {
 			}
 
 			pos = lineEnd + 1;
-			if (pos < bodyLen && _request.body[pos - 1] == '\r') {
+			if (pos > 0 && pos < bodyLen && _request.body[pos - 1] == '\r') {
 				pos++;
 			}
 		}
