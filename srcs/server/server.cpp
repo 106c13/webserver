@@ -9,23 +9,45 @@
 #include "ConfigParser.h"
 
 void Server::modifyToWrite(int fd) {
+#ifdef __linux__
     epoll_event ev;
     ev.events = EPOLLIN | EPOLLOUT;
     ev.data.fd = fd;
-
     epoll_ctl(epollFd_, EPOLL_CTL_MOD, fd, &ev);
+#elif __APPLE__
+    struct kevent ev;
+    EV_SET(&ev, fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
+    kevent(epollFd_, &ev, 1, NULL, 0, NULL);
+    EV_SET(&ev, fd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
+    kevent(epollFd_, &ev, 1, NULL, 0, NULL);
+#endif
 }
 
 void Server::modifyToRead(int fd) {
+#ifdef __linux__
     epoll_event ev;
     ev.events = EPOLLIN;
     ev.data.fd = fd;
-
     epoll_ctl(epollFd_, EPOLL_CTL_MOD, fd, &ev);
+#elif __APPLE__
+    struct kevent ev;
+    EV_SET(&ev, fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+    kevent(epollFd_, &ev, 1, NULL, 0, NULL);
+    EV_SET(&ev, fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
+    kevent(epollFd_, &ev, 1, NULL, 0, NULL);
+#endif
 }
 
 void Server::closeConnection(int fd) {
+#ifdef __linux__
     epoll_ctl(epollFd_, EPOLL_CTL_DEL, fd, NULL);
+#elif __APPLE__
+    struct kevent ev;
+    EV_SET(&ev, fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
+    kevent(epollFd_, &ev, 1, NULL, 0, NULL);
+    EV_SET(&ev, fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+    kevent(epollFd_, &ev, 1, NULL, 0, NULL);
+#endif
     close(fd);
     connections_.erase(fd);
     std::cout << "Client disconnected..." << std::endl;
@@ -48,15 +70,28 @@ static bool requestComplete(const Buffer& buf, size_t& endPos) {
     return false;
 }
 
-void Server::handleClient(epoll_event& event) {
-    int fd = event.data.fd;
+void Server::handleClient(Event& event) {
+    int fd;
+#ifdef __linux__
+    fd = event.data.fd;
+#elif __APPLE__
+    fd = (int)event.ident;
+#endif
 	Connection& conn = connections_[fd];
 
+#ifdef __linux__
 	if (event.events & EPOLLIN) {
         handleRead(conn);
 	} else if (event.events & EPOLLOUT) {
         return handleWrite(conn);
 	}
+#elif __APPLE__
+    if (event.filter == EVFILT_READ) {
+        handleRead(conn);
+    } else if (event.filter == EVFILT_WRITE) {
+        return handleWrite(conn);
+    }
+#endif
 
     if (conn.state == READING_HEADERS) {
         size_t endPos;
@@ -125,11 +160,16 @@ void Server::acceptConnection() {
 
         fcntl(clientFd, F_SETFL, O_NONBLOCK);
 
+#ifdef __linux__
         epoll_event ev;
         ev.events = EPOLLIN;
         ev.data.fd = clientFd;
-
         epoll_ctl(epollFd_, EPOLL_CTL_ADD, clientFd, &ev);
+#elif __APPLE__
+        struct kevent ev;
+        EV_SET(&ev, clientFd, EVFILT_READ, EV_ADD, 0, 0, NULL);
+        kevent(epollFd_, &ev, 1, NULL, 0, NULL);
+#endif
 
 		Connection& conn = connections_[clientFd];
 		conn.fd = clientFd;
@@ -179,16 +219,29 @@ void Server::initSocket() {
 }
 
 void Server::loop() {
+#ifdef __linux__
     epoll_event events[1024];
+#elif __APPLE__
+    struct kevent events[1024];
+#endif
 
     while (true) {
+#ifdef __linux__
         int evCount = epoll_wait(epollFd_, events, 1024, -1);
+#elif __APPLE__
+        int evCount = kevent(epollFd_, NULL, 0, events, 1024, NULL);
+#endif
         if (evCount < 0)
             continue;
 
         for (int i = 0; i < evCount; i++) {
-            int fd = events[i].data.fd;
-            epoll_event& ev = events[i];
+            int fd;
+#ifdef __linux__
+            fd = events[i].data.fd;
+#elif __APPLE__
+            fd = (int)events[i].ident;
+#endif
+            Event& ev = events[i];
 
             if (fd == serverFd_) {
                 acceptConnection();
@@ -200,18 +253,27 @@ void Server::loop() {
 }
 
 Server::Server(const ServerConfig& config) {
+#ifdef __linux__
 	epollFd_ = epoll_create(1024);
+#elif __APPLE__
+	epollFd_ = kqueue();
+#endif
 	config_ = config;
 	
 	initSocket();
 	
 	fcntl(serverFd_, F_SETFL, O_NONBLOCK);
 
+#ifdef __linux__
     epoll_event ev;
     ev.events = EPOLLIN;
     ev.data.fd = serverFd_;
-
     epoll_ctl(epollFd_, EPOLL_CTL_ADD, serverFd_, &ev);
+#elif __APPLE__
+    struct kevent ev;
+    EV_SET(&ev, serverFd_, EVFILT_READ, EV_ADD, 0, 0, NULL);
+    kevent(epollFd_, &ev, 1, NULL, 0, NULL);
+#endif
 }
 
 Server::~Server() {
