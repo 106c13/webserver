@@ -18,12 +18,12 @@ void Server::checkTimeOuts() {
         size_t diff = std::time(NULL) - conn.lastActivityTime;
 
         if ((conn.state == READING_HEADERS && diff > HEADER_TIMEOUT) ||
-            (conn.state == READING_BODY && diff > BODY_TIMEOUT)) 
+            ((conn.state == READING_BODY || conn.state == READING_CHUNKS) && diff > BODY_TIMEOUT)) 
         {
-            sendError(NOT_FOUND, conn);
-
+            conn.state = CLOSED;
+            sendError(REQUEST_TIMEOUT, conn);
             std::map<int, Connection>::iterator toErase = it++;
-            closeConnection(toErase->first);
+            //closeConnection(toErase->first);
         } else
             ++it;
     }
@@ -92,6 +92,28 @@ static bool requestComplete(const Buffer& buf, size_t& endPos) {
     return false;
 }
 
+static bool chunkedBodyComplete(const Buffer& buf, size_t& endPos) {
+    const char* data = buf.data();
+    size_t len = buf.size();
+
+    if (len < 5)
+        return false;
+
+
+    for (size_t i = 0; i + 4 < len; ++i) {
+        if (data[i] == '0' &&
+            data[i+1] == '\r' &&
+            data[i+2] == '\n' &&
+            data[i+3] == '\r' &&
+            data[i+4] == '\n')
+        {
+            endPos = i + 5;
+            return true;
+        }
+    }
+    return false;
+}
+
 static int checkRequest(const Request& request, const LocationConfig& location) {
 	if (location.methods.empty()) {
         return OK;
@@ -146,7 +168,7 @@ void Server::handleClient(Event& event) {
     if (conn.state == READING_HEADERS)
         processHeaders(conn);
 
-    if (conn.state == READING_BODY)
+    if (conn.state == READING_BODY || conn.state == READING_CHUNKS)
         processBody(conn);
 }
 
@@ -222,7 +244,20 @@ void Server::handleSimpleRequest(Connection& conn, size_t endPos) {
 }
 
 void Server::startBodyReading(Connection& conn, size_t endPos) {
-    StringMap::iterator it = conn.req.headers.find("Content-Length");
+    StringMap::iterator it = conn.req.headers.find("Transfer-Encoding");
+
+    if (it != conn.req.headers.end()) {
+        if (it->second != "chunked")
+            return sendError(BAD_REQUEST, conn);
+
+        conn.state = READING_CHUNKS;
+        conn.req.body.append(conn.recvBuffer.data(), endPos);
+        conn.recvBuffer.consume(endPos);
+
+        return;
+    }
+    
+    it = conn.req.headers.find("Content-Length");
 
     if (it == conn.req.headers.end())
         return sendError(BAD_REQUEST, conn);
@@ -248,6 +283,18 @@ void Server::processBody(Connection& conn) {
 
     if (available == 0)
         return;
+
+    if (conn.state == READING_CHUNKS) {
+        size_t endPos;
+        
+        if (chunkedBodyComplete(conn.recvBuffer, endPos)) {
+            conn.req.body.append(conn.recvBuffer.data(), endPos);
+            conn.recvBuffer.consume(endPos);
+            finishBody(conn);
+        }
+
+        return;
+    }
 
     size_t toConsume = std::min(available, conn.remainingBody);
 
@@ -357,6 +404,8 @@ void Server::loop() {
 #elif __APPLE__
         int evCount = kevent(epollFd_, NULL, 0, events, 1024, &timeout);
 #endif
+
+        checkTimeOuts();
         if (evCount < 0)
             continue;
 

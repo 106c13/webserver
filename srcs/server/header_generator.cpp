@@ -20,6 +20,8 @@ static std::string getStatus(int code) {
         return "404 Not Found";
     } else if (code == METHOD_NOT_ALLOWED) {
         return "405 Method Not Allowed";
+    } else if (code == REQUEST_TIMEOUT) {
+        return "408 Request Timeout";
     } else if (code == LENGTH_REQUIRED) {
         return "411 Length Required";
     } else if (code == PAYLOAD_TOO_LARGE) {

@@ -13,7 +13,7 @@ typedef std::map<std::string, std::string> StringMap;
 
 #define MAX_HEADER_SIZE 8000
 #define HEADER_TIMEOUT 10
-#define BODY_TIMEOUT 30
+#define BODY_TIMEOUT 5
 
 #define BUFFER_SIZE 1024 
 
@@ -37,6 +37,7 @@ enum Page {
 	NOT_FOUND = 404,
 	FORBIDDEN = 403,
 	METHOD_NOT_ALLOWED = 405,
+	REQUEST_TIMEOUT = 408,
 	LENGTH_REQUIRED = 411,
 	PAYLOAD_TOO_LARGE = 413,
 	SERVER_ERROR = 500,

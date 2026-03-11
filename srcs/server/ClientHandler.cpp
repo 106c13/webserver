@@ -19,6 +19,8 @@ void Server::handleRead(Connection& conn) {
 }
 
 void Server::handleWrite(Connection& conn) {
+    std::cout << conn.sendBuffer.data() << std::endl;
+
     while (!conn.sendBuffer.empty()) {
         ssize_t n = send(conn.fd,
                          conn.sendBuffer.data(),

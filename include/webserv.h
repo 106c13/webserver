@@ -45,7 +45,8 @@ enum ConnState {
 	PROCESSING = 62,
 	SENDING_RESPONSE = 61,
 	DRAINING_BODY = 60,
-	CLOSED = 59
+	CLOSED = 59,
+	READING_CHUNKS = 58
 };
 
 struct Connection {
