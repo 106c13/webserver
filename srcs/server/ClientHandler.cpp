@@ -3,7 +3,7 @@
 #include "Buffer.h"
 
 void Server::handleRead(Connection& conn) {
-    char buf[4096];
+    char buf[BUFFER_SIZE];
 
     while (true) {
         ssize_t n = recv(conn.fd, buf, sizeof(buf), 0);

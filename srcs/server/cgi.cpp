@@ -49,7 +49,7 @@ char** Server::createEnvironment(const Request& req) {
 
 void Server::sendCGIOutput(Connection& conn, int cgiFd) {
     std::string cgiOut;
-    char buf[1024];
+    char buf[BUFFER_SIZE];
     ssize_t n;
 
     while ((n = read(cgiFd, buf, sizeof(buf))) > 0)

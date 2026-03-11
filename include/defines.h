@@ -15,6 +15,8 @@ typedef std::map<std::string, std::string> StringMap;
 #define HEADER_TIMEOUT 10
 #define BODY_TIMEOUT 30
 
+#define BUFFER_SIZE 1024 
+
 enum Log {
 	INFO = 10,
 	WARNING = 11,

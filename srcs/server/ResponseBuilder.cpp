@@ -49,7 +49,7 @@ bool Server::streamFileChunk(Connection& conn) {
     if (conn.fileFd < 0)
         return false;
 
-    char buf[4096];
+    char buf[BUFFER_SIZE * 4];
     ssize_t n = read(conn.fileFd, buf, sizeof(buf));
     buf[n] = 0;
 

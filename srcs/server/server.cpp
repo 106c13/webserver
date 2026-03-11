@@ -345,13 +345,17 @@ void Server::loop() {
     epoll_event events[1024];
 #elif __APPLE__
     struct kevent events[1024];
+    struct timespec timeout;
+    
+    timeout.tv_sec = 1;
+    timeout.tv_nsec = 0;
 #endif
 
     while (true) {
 #ifdef __linux__
         int evCount = epoll_wait(epollFd_, events, 1024, 1000);
 #elif __APPLE__
-        int evCount = kevent(epollFd_, NULL, 0, events, 1024, 1000);
+        int evCount = kevent(epollFd_, NULL, 0, events, 1024, &timeout);
 #endif
         if (evCount < 0)
             continue;
