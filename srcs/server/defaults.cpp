@@ -75,6 +75,22 @@ static const char* generateDefaultPage(int code, size_t* pageSize) {
 	<p>WebServ 42</p>\n\
 </body>\n\
 </html>";
+	} else if (code == PAYLOAD_TOO_LARGE) {
+		*pageSize = 260;
+		return
+"<!DOCTYPE html>\n\
+<html>\n\
+<head>\n\
+	<meta charset=\"UTF-8\">\n\
+	<title>413 Payload Too Large</title>\n\
+</head>\n\
+<body>\n\
+	<h1>413 Payload Too Large</h1>\n\
+	<p>The request body exceeds the maximum size allowed by the server.</p>\n\
+	<hr>\n\
+	<p>WebServ 42</p>\n\
+</body>\n\
+</html>";
 	} else if (code == SERVER_ERROR) {
 		*pageSize = 297;
 		return
@@ -107,15 +123,18 @@ static const char* generateDefaultPage(int code, size_t* pageSize) {
 "    <p>WebServ 42</p>\n"
 "</body>\n"
 "</html>";
-	} 
-	log(ERROR, "Unkown error code");
-	return "<h1> SAY MY NAME </h1>";
+	}
+	*pageSize = 0;
+	return "";
 }
 
 void Server::sendError(int code, Connection& conn) {
     Response& res = conn.res;
 
 	conn.sendBuffer.clear();
+
+	if (code == DIRECTORY_NO_INDEX)
+		code = NOT_FOUND;
 
     res.status = code;
     res.contentType = "text/html";
@@ -148,6 +167,7 @@ void Server::sendError(int code, Connection& conn) {
 
     conn.sendBuffer.append(header);
     conn.sendBuffer.append(page, pageSize);
+	conn.state = SENDING_RESPONSE;
 
     modifyToWrite(conn.fd);
 }

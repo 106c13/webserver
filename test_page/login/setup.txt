@@ -1,0 +1,24 @@
+CREATE DATABASE IF NOT EXISTS beautiful_login
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_unicode_ci;
+
+USE beautiful_login;
+
+CREATE TABLE IF NOT EXISTS users (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    
+    file_path VARCHAR(255) DEFAULT NULL,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE KEY unique_username (username),
+    UNIQUE KEY unique_email (email)
+);
+
+CREATE USER 'devuser'@'localhost' IDENTIFIED BY 'StrongPassword123!';
+GRANT ALL PRIVILEGES ON webserv.* TO 'devuser'@'localhost';
+FLUSH PRIVILEGES;

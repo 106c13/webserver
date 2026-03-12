@@ -3,7 +3,7 @@
 #include "Buffer.h"
 
 void Server::handleRead(Connection& conn) {
-    char buf[4096];
+    char buf[BUFFER_SIZE];
 
     while (true) {
         ssize_t n = recv(conn.fd, buf, sizeof(buf), 0);
@@ -14,10 +14,13 @@ void Server::handleRead(Connection& conn) {
             return closeConnection(conn.fd);
         else
             break;
+        break;
     }
 }
 
 void Server::handleWrite(Connection& conn) {
+    std::cout << conn.sendBuffer.data() << std::endl;
+
     while (!conn.sendBuffer.empty()) {
         ssize_t n = send(conn.fd,
                          conn.sendBuffer.data(),
@@ -25,10 +28,17 @@ void Server::handleWrite(Connection& conn) {
                          0);
         if (n > 0) {
             conn.sendBuffer.consume(n);
-        } else {
-            if (errno == EAGAIN || errno == EWOULDBLOCK)
-                break;
+        } else if (n == 0) {
             return closeConnection(conn.fd);
+        } else {
+            break;
+        }
+    }
+
+    if (conn.state == SENDING_RESPONSE) {
+        if (conn.sendBuffer.empty() && !conn.sendingFile) {
+            conn.state = CLOSED;
+            return;
         }
     }
     
@@ -39,4 +49,5 @@ void Server::handleWrite(Connection& conn) {
     if (conn.sendBuffer.empty()) {
         modifyToRead(conn.fd);
     }
+
 }
