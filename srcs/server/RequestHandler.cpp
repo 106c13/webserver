@@ -30,6 +30,7 @@ void Server::handleRequest(Connection& conn) {
 	std::string cgiPath = findCGI(req.path, location.cgi);
 
 	if (!cgiPath.empty()) {
+        std::cout << "Running cgi\n";
 		int fd = runCGI(cgiPath.c_str(), conn);
 		if (fd < 0) {
 			return sendError(SERVER_ERROR, conn);

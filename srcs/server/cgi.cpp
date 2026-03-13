@@ -5,17 +5,20 @@
 #include "webserv.h"
 
 char** Server::createEnvironment(const Request& req) {
-    char** env = new char*[11];
+    char** env = new char*[12];
     int i = 0;
 
     std::string method = "REQUEST_METHOD=" + req.method;
     env[i++] = strdup(method.c_str());
 
-	std::string redirectStatus = "REDIRECT_STATUS=200";
-	env[i++] = strdup(redirectStatus.c_str());
+    std::string redirectStatus = "REDIRECT_STATUS=200";
+    env[i++] = strdup(redirectStatus.c_str());
 
     std::string script = "SCRIPT_FILENAME=" + req.path;
     env[i++] = strdup(script.c_str());
+
+    std::string pathInfo = "PATH_INFO=" + req.path;
+    env[i++] = strdup(pathInfo.c_str());
 
     std::string query = "QUERY_STRING=" + req.queryString;
     env[i++] = strdup(query.c_str());
@@ -34,7 +37,7 @@ char** Server::createEnvironment(const Request& req) {
 
     if (req.method == "POST") {
         std::string contentLength =
-            "CONTENT_LENGTH=" + req.headers.at("Content-Length");
+            "CONTENT_LENGTH=" + toString(req.body.size());
         env[i++] = strdup(contentLength.c_str());
 
         std::string contentType =
@@ -43,7 +46,9 @@ char** Server::createEnvironment(const Request& req) {
     }
 
     env[i] = NULL;
-
+    for (int j = 0; j < i; j++) {
+        std::cout << env[j] << std::endl;
+    }
     return env;
 }
 
@@ -106,6 +111,7 @@ int Server::runCGI(const char* cgiPath, Connection& conn) {
         return -1;
     }
 
+    char** env = createEnvironment(conn.req);
     pid_t pid = fork();
     if (pid < 0) {
         log(ERROR, "FORK ERROR");
@@ -122,7 +128,6 @@ int Server::runCGI(const char* cgiPath, Connection& conn) {
         close(stdinPipe[0]);
         close(stdoutPipe[1]);
 
-        char** env = createEnvironment(conn.req);
 
         char* argv[] = {
             const_cast<char*>(cgiPath),
@@ -142,11 +147,18 @@ int Server::runCGI(const char* cgiPath, Connection& conn) {
         const std::string& body = conn.req.body;
         size_t size = body.size();
         size_t total = 0;
-
+        size_t n;
+        std::cout << "Pipes: " << stdinPipe[1] << std::endl;
         while (total < size) {
-            ssize_t n = write(stdinPipe[1],
-                              body.data() + total,
-                              size - total);
+            if (size - total > 1024) {
+                n = write(stdinPipe[1],
+                        body.data() + total,
+                        1024);
+            } else {
+                n = write(stdinPipe[1],
+                        body.data() + total,
+                        size - total);
+            }
 
             if (n <= 0) {
                 log(ERROR, "WRITE TO CGI STDIN FAILED");
@@ -154,6 +166,7 @@ int Server::runCGI(const char* cgiPath, Connection& conn) {
             }
 
             total += n;
+            std::cout << "Writing " << total << std::endl;
         }
     }
 
@@ -162,7 +175,7 @@ int Server::runCGI(const char* cgiPath, Connection& conn) {
     return stdoutPipe[0];
 }
 
-std::string Server::findCGI(const std::string& fileName, const StringMap& cgiMap) {
+std::string findCGI(const std::string& fileName, const StringMap& cgiMap) {
 	std::string extension;
 
 	for (int i = fileName.size() - 1; i >= 0; i--) {

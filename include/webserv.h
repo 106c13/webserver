@@ -40,13 +40,16 @@ typedef struct kevent Event;
 #endif
 
 enum ConnState {
-	READING_HEADERS = 64,
-	READING_BODY = 63,
-	PROCESSING = 62,
-	SENDING_RESPONSE = 61,
-	DRAINING_BODY = 60,
-	CLOSED = 59,
-	READING_CHUNKS = 58
+    READING_HEADERS = 50,
+    READING_BODY = 51,
+    READING_CHUNKS = 52,
+    READING_CHUNK_SIZE = 53,
+    READING_CHUNK_DATA = 54,
+    READING_CHUNK_CRLF = 55,
+    PROCESSING = 56,
+    SENDING_RESPONSE = 57,
+    TIMEOUT = 58,
+    CLOSED = 59
 };
 
 struct Connection {
@@ -65,6 +68,8 @@ struct Connection {
 	int			state;
 
 	time_t		lastActivityTime;
+
+	size_t currentChunkSize;
 };
 
 
@@ -102,7 +107,6 @@ class	Server {
 		LocationConfig&	resolveLocation(std::string& fs_path);
 		void			generateAutoindex(Connection& conn, LocationConfig& location);
 		void			sendRedirect(Connection& conn, const LocationConfig& location);
-		std::string		findCGI(const std::string& fileName, const StringMap& cgiMap);
 		bool			prepareFileResponse(Connection& conn, const std::string& path);
 		bool			streamFileChunk(Connection& conn);
 		void			sendError(int code, Connection& conn);
@@ -110,6 +114,7 @@ class	Server {
 		
 		void			finishBody(Connection& conn);
 		void			processBody(Connection& conn);
+		void			processChunkedBody(Connection& conn);
 		void			startBodyReading(Connection& conn, size_t endPos);
 		void			handleSimpleRequest(Connection& conn, size_t endPos);
 		bool			validateRequest(Connection& conn);
@@ -131,4 +136,5 @@ ssize_t					getFileSize(const std::string& path);
 std::string				readFile(const std::string& filename);
 std::vector<DirEntry>	listDirectory(const std::string& path);
 std::string				toString(size_t n);
+std::string				findCGI(const std::string& fileName, const StringMap& cgiMap);
 #endif

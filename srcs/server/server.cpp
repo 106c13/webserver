@@ -114,7 +114,7 @@ static bool chunkedBodyComplete(const Buffer& buf, size_t& endPos) {
     return false;
 }
 
-static int checkRequest(const Request& request, const LocationConfig& location) {
+static int checkRequest(const Request& req, const LocationConfig& location) {
 	if (location.methods.empty()) {
         return OK;
 	}
@@ -122,10 +122,16 @@ static int checkRequest(const Request& request, const LocationConfig& location) 
     for (std::vector<std::string>::const_iterator it = location.methods.begin();
          it != location.methods.end();
          ++it) {
-        if (*it == request.method) {
+        if (*it == req.method) {
             return OK;
         }
     }
+
+	std::string cgiPath = findCGI(req.path, location.cgi);
+    std::cout << "TEST: ======================== " << cgiPath << std::endl;
+    if (!cgiPath.empty())
+        return OK;
+
     return METHOD_NOT_ALLOWED;
 }
 
@@ -168,7 +174,11 @@ void Server::handleClient(Event& event) {
     if (conn.state == READING_HEADERS)
         processHeaders(conn);
 
-    if (conn.state == READING_BODY || conn.state == READING_CHUNKS)
+    if (conn.state == READING_BODY ||
+        conn.state == READING_CHUNKS ||
+        conn.state == READING_CHUNK_SIZE ||
+        conn.state == READING_CHUNK_DATA ||
+        conn.state == READING_CHUNK_CRLF)
         processBody(conn);
 }
 
@@ -186,6 +196,7 @@ void Server::processHeaders(Connection& conn) {
 
     std::string raw(conn.recvBuffer.data(), endPos);
 
+    std::cout << raw;
     parser_.parse(raw);
     conn.req = parser_.getRequest();
 
@@ -250,7 +261,7 @@ void Server::startBodyReading(Connection& conn, size_t endPos) {
         if (it->second != "chunked")
             return sendError(BAD_REQUEST, conn);
 
-        conn.state = READING_CHUNKS;
+        conn.state = READING_CHUNK_SIZE;
         conn.req.body.append(conn.recvBuffer.data(), endPos);
         conn.recvBuffer.consume(endPos);
 
@@ -278,28 +289,82 @@ void Server::startBodyReading(Connection& conn, size_t endPos) {
     conn.state = READING_BODY;
 }
 
-void Server::processBody(Connection& conn) {
-    size_t available = conn.recvBuffer.size();
+void Server::processChunkedBody(Connection& conn) {
+    while (conn.recvBuffer.size() > 0) {
+        std::cout << "WTF " << conn.state << std::endl;
+        std::cout << conn.recvBuffer.size() << std::endl;
+        if (conn.state == READING_CHUNK_SIZE) {
+            // look for \r\n
+            const char* data = conn.recvBuffer.data();
+            size_t len = conn.recvBuffer.size();
+            size_t i;
+            for (i = 0; i + 1 < len; ++i) {
+                if (data[i] == '\r' && data[i+1] == '\n') {
+                    break;
+                }
+            }
 
-    if (available == 0)
-        return;
+            if (i + 1 >= len) // haven't received full line yet
+                return;
 
-    if (conn.state == READING_CHUNKS) {
-        size_t endPos;
-        
-        if (chunkedBodyComplete(conn.recvBuffer, endPos)) {
-            conn.req.body.append(conn.recvBuffer.data(), endPos);
-            conn.recvBuffer.consume(endPos);
-            finishBody(conn);
+            // parse hex chunk size
+            std::string line(data, i);
+            conn.currentChunkSize = strtoul(line.c_str(), NULL, 16);
+
+            conn.recvBuffer.consume(i + 2); // remove chunk size line + \r\n
+
+            if (conn.currentChunkSize == 0) {
+                conn.state = PROCESSING;
+                finishBody(conn);
+                return;
+            }
+
+            conn.state = READING_CHUNK_DATA;
         }
 
+        if (conn.state == READING_CHUNK_DATA) {
+            size_t available = conn.recvBuffer.size();
+            size_t toConsume = std::min(available, conn.currentChunkSize);
+
+            conn.req.body.append(conn.recvBuffer.data(), toConsume);
+            conn.recvBuffer.consume(toConsume);
+            conn.currentChunkSize -= toConsume;
+
+            if (conn.currentChunkSize == 0)
+                conn.state = READING_CHUNK_CRLF;
+            else
+                return; // wait for more data
+        }
+
+        if (conn.state == READING_CHUNK_CRLF) {
+            // expect \r\n after chunk data
+            if (conn.recvBuffer.size() < 2)
+                return; // wait for more
+
+            conn.recvBuffer.consume(2);
+            conn.state = READING_CHUNK_SIZE; // next chunk
+        }
+    }
+}
+
+void Server::processBody(Connection& conn) {
+    if (conn.state == READING_CHUNKS ||
+        conn.state == READING_CHUNK_SIZE ||
+        conn.state == READING_CHUNK_DATA ||
+        conn.state == READING_CHUNK_CRLF)
+    {
+        std::cout << "CHUNKS " << conn.req.body.size() << std::endl;
+        processChunkedBody(conn);
         return;
     }
 
+    // normal Content-Length body
+    size_t available = conn.recvBuffer.size();
+    if (available == 0)
+        return;
+
     size_t toConsume = std::min(available, conn.remainingBody);
-
     conn.req.body.append(conn.recvBuffer.data(), toConsume);
-
     conn.recvBuffer.consume(toConsume);
     conn.remainingBody -= toConsume;
 
@@ -310,8 +375,11 @@ void Server::processBody(Connection& conn) {
 void Server::finishBody(Connection& conn) {
     conn.state = PROCESSING;
 
+    std::cout << "Body finished\n";
+    std::cout << "Size: " << conn.req.body.size() << std::endl;
     parser_.parse(conn.req.body);
     conn.req = parser_.getRequest();
+    std::cout << "Parsed\n";
 
     handleRequest(conn);
 }
