@@ -13,12 +13,16 @@ int deleteResource(const std::string& path) {
     return NO_CONTENT;
 }
 
-
 void Server::handleRequest(Connection& conn) {
     Request& req = conn.req;
     Response& res = conn.res;
     
     LocationConfig location = resolveLocation(req.path);
+
+    if (location.root.empty()) {
+        return sendError(OK, conn);
+    }
+
     resolvePath(req.path, location);
 
     res.path = req.path;
@@ -31,11 +35,8 @@ void Server::handleRequest(Connection& conn) {
 
 	if (!cgiPath.empty()) {
         std::cout << "Running cgi\n";
-		int fd = runCGI(cgiPath.c_str(), conn);
-		if (fd < 0) {
-			return sendError(SERVER_ERROR, conn);
-        }
-        return sendCGIOutput(conn, fd);
+		runCGI(cgiPath.c_str(), conn);
+        return;
 	}
 	
 	if (req.method == "POST") {

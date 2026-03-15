@@ -1,0 +1,15 @@
+functions:
+	handleRequest()
+	createEvironment()
+	runCGI()
+	handlCGIRead()
+	resolvePath()
+	validateRequest()
+	processChunkedBody()
+	loop()
+
+bugs:
+	resolveLocation shouldn't modify path
+
+struture:
+	server.c too much function, very inflexible strucure

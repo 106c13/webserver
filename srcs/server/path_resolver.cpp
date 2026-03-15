@@ -59,6 +59,10 @@ LocationConfig& Server::resolveLocation(std::string& fs_path) {
     LocationConfig* best = NULL;
     size_t best_len = 0;
 
+
+    if (fs_path.size() > 1 && fs_path[fs_path.size() - 1] == '/')
+        fs_path.erase(fs_path.length() - 1);
+
     for (LocationList::iterator it = config_.locations.begin();
          it != config_.locations.end();
          ++it) {

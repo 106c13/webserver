@@ -5,34 +5,23 @@
 void Server::handleRead(Connection& conn) {
     char buf[BUFFER_SIZE * 1000];
 
-    while (true) {
-        ssize_t n = recv(conn.fd, buf, sizeof(buf), 0);
+    ssize_t n = recv(conn.fd, buf, sizeof(buf), 0);
 
-        if (n > 0)
-            conn.recvBuffer.append(buf, n);
-        else if (n == 0)
-            return closeConnection(conn.fd);
-        else
-            break;
-        break;
-    }
+    if (n > 0)
+        conn.recvBuffer.append(buf, n);
+    else if (n == 0)
+        return closeConnection(conn.fd);
 }
 
 void Server::handleWrite(Connection& conn) {
-    std::cout << conn.sendBuffer.data() << std::endl;
-
-    while (!conn.sendBuffer.empty()) {
-        ssize_t n = send(conn.fd,
-                         conn.sendBuffer.data(),
-                         conn.sendBuffer.size(),
-                         0);
-        if (n > 0) {
-            conn.sendBuffer.consume(n);
-        } else if (n == 0) {
-            return closeConnection(conn.fd);
-        } else {
-            break;
-        }
+    ssize_t n = send(conn.fd,
+                     conn.sendBuffer.data(),
+                     conn.sendBuffer.size(),
+                     0);
+    if (n > 0) {
+        conn.sendBuffer.consume(n);
+    } else if (n == 0) {
+        return closeConnection(conn.fd);
     }
 
     if (conn.state == SENDING_RESPONSE) {
@@ -41,11 +30,11 @@ void Server::handleWrite(Connection& conn) {
             return;
         }
     }
-    
+
     if (conn.sendingFile) {
         streamFileChunk(conn);
     }
-
+    
     if (conn.sendBuffer.empty()) {
         modifyToRead(conn.fd);
     }

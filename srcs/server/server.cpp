@@ -1,6 +1,7 @@
 #include <unistd.h>  
 #include <fcntl.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #include <ctime>
 #include <iostream>
 #include <exception>
@@ -28,7 +29,6 @@ void Server::checkTimeOuts() {
             ++it;
     }
 }
-
 
 void Server::modifyToWrite(int fd) {
 #ifdef __linux__
@@ -128,7 +128,6 @@ static int checkRequest(const Request& req, const LocationConfig& location) {
     }
 
 	std::string cgiPath = findCGI(req.path, location.cgi);
-    std::cout << "TEST: ======================== " << cgiPath << std::endl;
     if (!cgiPath.empty())
         return OK;
 
@@ -199,6 +198,8 @@ void Server::processHeaders(Connection& conn) {
     std::cout << raw;
     parser_.parse(raw);
     conn.req = parser_.getRequest();
+    conn.headerSize = endPos;
+    std::cout << "header Size: " << conn.headerSize << std::endl;
 
     log(INFO, conn.req.version + " " + conn.req.method + " " + conn.req.uri);
 
@@ -217,7 +218,10 @@ void Server::processHeaders(Connection& conn) {
 bool Server::validateRequest(Connection& conn) {
     std::string path = conn.req.path;
 
-    LocationConfig location = resolveLocation(path);
+    conn.location = resolveLocation(path);
+    LocationConfig& location = conn.location; 
+
+    std::cout << "Location: " << location.path << " " << location.methods[0] << std::endl;
 
     int status = checkRequest(conn.req, location);
     if (status != OK) {
@@ -228,6 +232,44 @@ bool Server::validateRequest(Connection& conn) {
     if (location.redirectCode != 0) {
         sendRedirect(conn, location);
         return false;
+    }
+
+
+    std::string cgiPath = findCGI(path, location.cgi);
+    if (!cgiPath.empty()) { 
+        return true;
+    }
+
+    // ============= Check size =================
+    StringMap::iterator it = conn.req.headers.find("Transfer-Encoding");
+
+    if (it != conn.req.headers.end()) {
+        if (it->second != "chunked") {
+            sendError(BAD_REQUEST, conn);
+            return false;
+        }
+    } else if (conn.req.method == "POST"){
+        it = conn.req.headers.find("Content-Length");
+
+        if (it == conn.req.headers.end()) {
+            sendError(BAD_REQUEST, conn);
+            return false;
+        }
+
+        size_t length = std::strtoul(it->second.c_str(), NULL, 10);
+        std::cout << "TEST length = " << length << std::endl;
+
+        if (location.hasClientMaxBodySize &&
+            length > location.clientMaxBodySize)
+        {
+            sendError(PAYLOAD_TOO_LARGE, conn);
+            return false;
+        }
+    }
+    // ==============================================
+
+    if (location.root.empty()) {
+        return true;
     }
 
     status = resolvePath(path, location);
@@ -278,7 +320,7 @@ void Server::startBodyReading(Connection& conn, size_t endPos) {
 
     conn.remainingBody = std::strtoul(it->second.c_str(), NULL, 10);
 
-    LocationConfig location = resolveLocation(conn.req.path);
+    LocationConfig& location = conn.location;
 
     if (location.hasClientMaxBodySize &&
         conn.remainingBody > location.clientMaxBodySize)
@@ -291,8 +333,7 @@ void Server::startBodyReading(Connection& conn, size_t endPos) {
 
 void Server::processChunkedBody(Connection& conn) {
     while (conn.recvBuffer.size() > 0) {
-        std::cout << "WTF " << conn.state << std::endl;
-        std::cout << conn.recvBuffer.size() << std::endl;
+        //std::cout << conn.recvBuffer.size() << std::endl;
         if (conn.state == READING_CHUNK_SIZE) {
             // look for \r\n
             const char* data = conn.recvBuffer.data();
@@ -348,12 +389,19 @@ void Server::processChunkedBody(Connection& conn) {
 }
 
 void Server::processBody(Connection& conn) {
+    LocationConfig& location = conn.location; 
+
     if (conn.state == READING_CHUNKS ||
         conn.state == READING_CHUNK_SIZE ||
         conn.state == READING_CHUNK_DATA ||
         conn.state == READING_CHUNK_CRLF)
     {
-        std::cout << "CHUNKS " << conn.req.body.size() << std::endl;
+        if (location.clientMaxBodySize > 0 && 
+            conn.req.body.size() - conn.headerSize > location.clientMaxBodySize) {
+            sendError(PAYLOAD_TOO_LARGE, conn);
+            return;
+        }
+
         processChunkedBody(conn);
         return;
     }
@@ -414,6 +462,7 @@ void Server::acceptConnection() {
         conn.remainingBody = 0;
         conn.state = READING_HEADERS;
         conn.lastActivityTime = std::time(NULL);
+        conn.cgiHeaderSent = false;
         std::cout << "New connection..." << std::endl;
     }
 }
@@ -443,7 +492,7 @@ void Server::initSocket() {
 		throw std::runtime_error(oss.str());
 	}
 
-	if (listen(serverFd_, 10) < 0) {
+	if (listen(serverFd_, 99) < 0) {
 		oss << "listen() failed on port " << config_.port;
 		throw std::runtime_error(oss.str());
 	}
@@ -453,6 +502,25 @@ void Server::initSocket() {
 	oss << "Server started on port ";
 	oss << config_.port;
 	log(INFO, oss.str()); 
+}
+
+void Server::checkCGIProcesses() {
+    std::vector<CGIProcess>::iterator it = cgiProcesses_.begin();
+
+    while (it != cgiProcesses_.end()) {
+        int status;
+        pid_t result = waitpid(it->pid, &status, WNOHANG);
+
+        if (result > 0) {
+            // child exited, handle remaining CGI output
+            handleCGIRead(*(it->conn));
+
+            // erase from vector and update iterator
+            it = cgiProcesses_.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 void Server::loop() {
@@ -474,17 +542,41 @@ void Server::loop() {
 #endif
 
         checkTimeOuts();
+        checkCGIProcesses();
         if (evCount < 0)
             continue;
 
         for (int i = 0; i < evCount; i++) {
+
             int fd;
 #ifdef __linux__
             fd = events[i].data.fd;
 #elif __APPLE__
             fd = (int)events[i].ident;
 #endif
+
             Event& ev = events[i];
+
+            // -------- CGI PIPE HANDLING --------
+            std::map<int, Connection*>::iterator it = cgiFdMap_.find(fd);
+            if (it != cgiFdMap_.end()) {
+                Connection* conn = it->second;
+#ifdef __linux__
+                if (events[i].events & EPOLLOUT)
+                    handleCGIWrite(*conn);
+
+                if (events[i].events & EPOLLIN)
+                    handleCGIRead(*conn);
+#elif __APPLE__
+                if (events[i].filter == EVFILT_WRITE)
+                    handleCGIWrite(*conn);
+
+                if (events[i].filter == EVFILT_READ)
+                    handleCGIRead(*conn);
+#endif
+                continue;
+            }
+            // -----------------------------------
 
             if (fd == serverFd_) {
                 acceptConnection();

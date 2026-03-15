@@ -164,7 +164,7 @@ void Server::sendError(int code, Connection& conn) {
     page = generateDefaultPage(code, &pageSize);	
     res.contentLength = toString(pageSize);
     std::string header = generateHeader(res);
-
+	std::cout << header;
     conn.sendBuffer.append(header);
     conn.sendBuffer.append(page, pageSize);
 	conn.state = SENDING_RESPONSE;
