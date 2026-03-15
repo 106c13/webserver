@@ -3,9 +3,19 @@
 #include "Buffer.h"
 
 void Server::handleRead(Connection& conn) {
-    char buf[BUFFER_SIZE * 1000];
+    // When streaming body to CGI, cap the recv buffer to avoid
+    // accumulating the entire request body in memory.
+    size_t readSize;
+    if (conn.state == CGI_WRITING_BODY || conn.state == CGI_BUFFERING_TO_FILE) {
+        if (conn.recvBuffer.size() > BUFFER_SIZE * 16)
+            return;
+        readSize = BUFFER_SIZE * 16;
+    } else {
+        readSize = BUFFER_SIZE * 1000;
+    }
 
-    ssize_t n = recv(conn.fd, buf, sizeof(buf), 0);
+    char buf[BUFFER_SIZE * 1000];
+    ssize_t n = recv(conn.fd, buf, readSize, 0);
 
     if (n > 0)
         conn.recvBuffer.append(buf, n);

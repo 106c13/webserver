@@ -1,2 +1,7 @@
 t.py
 test_page/login/uploads/*
+tester
+cgi_tester
+obj/
+php-cgi
+webserv

@@ -2,88 +2,86 @@
 #include <sstream>
 #include "webserv.h"
 
-static std::string humanSize(size_t bytes)
-{
+// ── DirEntry type constants ──────────────────────────────────────────────────
+
+static const int ENTRY_DIR   = 1;
+static const int ENTRY_IMAGE = 2;
+
+// ── internal helpers ─────────────────────────────────────────────────────────
+
+static std::string humanSize(size_t bytes) {
     const char* units[] = {"B", "KB", "MB", "GB"};
     double size = bytes;
     int unit = 0;
 
     while (size >= 1024 && unit < 3) {
         size /= 1024;
-        unit++;
+        ++unit;
     }
 
     std::ostringstream ss;
     ss.setf(std::ios::fixed);
-    ss.precision(1);          // 1 decimal like nginx
+    ss.precision(1);
     ss << size << " " << units[unit];
-
     return ss.str();
 }
 
+static const char* entryIcon(const DirEntry& entry) {
+    if (entry.type == ENTRY_DIR)   return "📁 ";
+    if (entry.type == ENTRY_IMAGE) return "🖼️ ";
+    return "📄 ";
+}
 
-void Server::generateAutoindex(Connection& conn, LocationConfig& location)
-{
-    Request& req = conn.req;
-    Response& res = conn.res;
+static std::string buildEntryRow(const DirEntry& entry, const std::string& path) {
+    std::string size = entry.is_dir ? "-" : humanSize(entry.size);
+    std::ostringstream row;
+    row << "<tr>"
+        << "<td>" << entryIcon(entry)
+        << "<a style=\"margin-left:15px;\" href=\"" << path << entry.name << "\">"
+        << entry.name << "</a></td>"
+        << "<td style=\"text-align:right; padding-left:40px;\">" << size << "</td>"
+        << "</tr>\n";
+    return row.str();
+}
 
-    std::string path = req.uri;
-    if (!path.empty() && path[path.length() - 1] != '/') {
+static std::string buildAutoindexPage(const std::string& path,
+                                      const std::vector<DirEntry>& entries) {
+    std::ostringstream page;
+    page << "<!DOCTYPE html>\n"
+         << "<html>\n<head>\n"
+         << "<meta charset=\"UTF-8\">\n"
+         << "<title>Index of " << path << "</title>\n"
+         << "</head>\n<body>\n"
+         << "<h1>Index of " << path << "</h1>\n<hr>\n"
+         << "<table>\n";
+
+    for (std::vector<DirEntry>::const_iterator it = entries.begin();
+         it != entries.end(); ++it)
+        page << buildEntryRow(*it, path);
+
+    page << "</table>\n"
+         << "</body></html>";
+    return page.str();
+}
+
+// ── Server method ────────────────────────────────────────────────────────────
+
+void Server::generateAutoindex(Connection& conn, LocationConfig& location) {
+    std::string path = conn.req.uri;
+    if (path.empty() || path[path.size() - 1] != '/')
         path += '/';
-    }
 
-    std::vector<DirEntry> dirs = listDirectory(location.root + path);
+    std::vector<DirEntry> entries = listDirectory(location.root + path);
+    std::string page = buildAutoindexPage(path, entries);
 
-    std::string page;
-
-    page += "<!DOCTYPE html>\n";
-    page += "<html>\n<head>\n";
-    page += "<meta charset=\"UTF-8\">\n";
-    page += "<title>Index of " + path + "</title>\n";
-    page += "</head>\n<body>\n";
-    page += "<h1>Index of " + path + "</h1>\n<hr>\n";
-
-    page += "<table>\n";
-
-    for (std::vector<DirEntry>::iterator it = dirs.begin();
-         it != dirs.end();
-         ++it)
-    {
-        std::string icon;
-
-        if (it->type == 1)
-            icon = "📁 ";
-        else if (it->type == 2)
-            icon = "🖼️ ";
-        else
-            icon = "📄 ";
-
-        page += "<tr>";
-
-        page += "<td>";
-        page += icon;
-        page += "<a style=\"margin-left:15px;\" href=\"" + path + it->name + "\">" + it->name + "</a>";
-        page += "</td>";
-
-        page += "<td style=\"text-align:right; padding-left:40px;\">";
-        page += (it->is_dir ? "-" : humanSize(it->size));
-        page += "</td>";
-
-        page += "</tr>\n";
-    }
-
-    page += "</table>\n";
-    page += "</body></html>";
-
-    res.status = OK;
-    res.contentType = "text/html";
-    res.contentLength = toString(page.size());
+    Response& res      = conn.res;
+    res.status         = OK;
+    res.contentType    = "text/html";
+    res.contentLength  = toString(page.size());
     res.connectionType = "close";
 
-    std::string header = generateHeader(res);
-    conn.sendBuffer.append(header);
+    conn.sendBuffer.append(generateHeader(res));
     conn.sendBuffer.append(page);
     conn.state = SENDING_RESPONSE;
-
     modifyToWrite(conn.fd);
 }

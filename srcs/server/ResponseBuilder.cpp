@@ -1,46 +1,45 @@
-
 #include <fcntl.h>
 #include <string>
 #include "webserv.h"
 #include "ConfigParser.h"
 
-void Server::sendRedirect(Connection& conn, const LocationConfig& location) {
-	Response& res = conn.res;
-	std::string header;
+// ── internal helper ──────────────────────────────────────────────────────────
 
-
-	res.status = location.redirectCode;
-	res.location = location.redirectUrl;
-	res.contentLength = "0";
-
-	header = generateHeader(res);
+static void flushHeader(Connection& conn) {
+    std::string header = generateHeader(conn.res);
     conn.sendBuffer.append(header);
+    log(INFO, header.substr(0, header.find("\n")));
+}
 
+// ── Server methods ───────────────────────────────────────────────────────────
+
+void Server::sendRedirect(Connection& conn, const LocationConfig& location) {
+    Response& res = conn.res;
+    res.status        = location.redirectCode;
+    res.location      = location.redirectUrl;
+    res.contentLength = "0";
+
+    flushHeader(conn);
     modifyToWrite(conn.fd);
 }
 
 bool Server::prepareFileResponse(Connection& conn, const std::string& path) {
     ssize_t size = getFileSize(path);
-    if (size < 0) {
+    if (size < 0)
         return false;
-    }
 
     int fd = open(path.c_str(), O_RDONLY);
-    if (fd < 0) {
+    if (fd < 0)
         return false;
-    }
 
-    Response& res = conn.res;
-    res.path = path;
+    Response& res     = conn.res;
+    res.path          = path;
     res.contentLength = toString(size);
     res.connectionType = "close";
 
-    std::string header = generateHeader(res);
-    conn.sendBuffer.append(header);
+    flushHeader(conn);
 
-	log(INFO, header.substr(0, header.find("\n")));
-
-    conn.fileFd = fd;
+    conn.fileFd      = fd;
     conn.sendingFile = true;
     return true;
 }
@@ -51,7 +50,6 @@ bool Server::streamFileChunk(Connection& conn) {
 
     char buf[BUFFER_SIZE * 4];
     ssize_t n = read(conn.fileFd, buf, sizeof(buf));
-    buf[n] = 0;
 
     if (n > 0) {
         conn.sendBuffer.append(buf, n);
@@ -59,9 +57,8 @@ bool Server::streamFileChunk(Connection& conn) {
     }
 
     close(conn.fileFd);
-    conn.fileFd = -1;
+    conn.fileFd      = -1;
     conn.sendingFile = false;
-    conn.state = SENDING_RESPONSE;
+    conn.state       = SENDING_RESPONSE;
     return false;
 }
-

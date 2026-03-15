@@ -13,77 +13,67 @@ int deleteResource(const std::string& path) {
     return NO_CONTENT;
 }
 
+bool Server::handleMultipartUpload(Connection& conn, LocationConfig& location) {
+    for (std::vector<MultipartPart>::iterator it = conn.req.multipartParts.begin();
+         it != conn.req.multipartParts.end();
+         ++it)
+    {
+        if (it->filename.empty())
+            continue;
+
+        std::string safeName = it->filename;
+        size_t slash = safeName.find_last_of("/\\");
+        if (slash != std::string::npos)
+            safeName = safeName.substr(slash + 1);
+
+        std::string fullPath = location.uploadDir + "/" + safeName;
+
+        int fd = open(fullPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd < 0)
+            return false;
+
+        ssize_t written = write(fd, it->data.data(), it->data.size());
+        close(fd);
+
+        if (written < 0)
+            return false;
+    }
+    return true;
+}
+
 void Server::handleRequest(Connection& conn) {
     Request& req = conn.req;
     Response& res = conn.res;
-    
-    LocationConfig location = resolveLocation(req.path);
 
-    if (location.root.empty()) {
+    LocationConfig location = resolveLocation(req.path);
+    if (location.root.empty())
         return sendError(OK, conn);
-    }
 
     resolvePath(req.path, location);
-
     res.path = req.path;
-	
-	if (req.method == "DELETE") {
-		return sendError(deleteResource(req.path), conn);
-	}
 
-	std::string cgiPath = findCGI(req.path, location.cgi);
+    if (req.method == "DELETE")
+        return sendError(deleteResource(req.path), conn);
 
-	if (!cgiPath.empty()) {
+    std::string cgiPath = findCGI(req.path, location.cgi);
+    if (!cgiPath.empty()) {
         std::cout << "Running cgi\n";
-		runCGI(cgiPath.c_str(), conn);
+        runCGI(cgiPath.c_str(), conn);
         return;
-	}
-	
-	if (req.method == "POST") {
+    }
+
+    if (req.method == "POST") {
         std::string contentType = req.headers["Content-Type"];
-
         if (contentType.find("multipart/form-data") != std::string::npos) {
-            StringMap formFields;
-
-            for (std::vector<MultipartPart>::iterator it = req.multipartParts.begin();
-                 it != req.multipartParts.end();
-                 ++it)
-            {
-                if (!it->filename.empty()) {
-                    std::string uploadDir = location.uploadDir;
-                    std::string safeName = it->filename;
-
-                    size_t slash = safeName.find_last_of("/\\");
-                    if (slash != std::string::npos)
-                        safeName = safeName.substr(slash + 1);
-
-                    std::string fullPath = uploadDir + "/" + safeName;
-
-                    int fd = open(fullPath.c_str(),
-                                  O_WRONLY | O_CREAT | O_TRUNC,
-                                  0644);
-
-                    if (fd < 0)
-                        return sendError(SERVER_ERROR, conn);
-
-                    ssize_t written = write(fd,
-                                            it->data.data(),
-                                            it->data.size());
-
-                    close(fd);
-
-                    if (written < 0)
-                        return sendError(SERVER_ERROR, conn);
-                } else {
-                    formFields[it->name] = it->data;
-                }
-            }
+            if (!handleMultipartUpload(conn, location))
+                return sendError(SERVER_ERROR, conn);
         }
     }
-	conn.res.status = OK;
+
+    conn.res.status = OK;
     if (!prepareFileResponse(conn, req.path))
         return sendError(SERVER_ERROR, conn);
 
     streamFileChunk(conn);
-	modifyToWrite(conn.fd);
+    modifyToWrite(conn.fd);
 }

@@ -5,6 +5,7 @@
 #include <ctime>
 #include <iostream>
 #include <exception>
+#include <cerrno>
 #include <cstring>
 #include <sstream>
 #include "webserv.h"
@@ -70,6 +71,12 @@ void Server::closeConnection(int fd) {
     EV_SET(&ev, fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
     kevent(epollFd_, &ev, 1, NULL, 0, NULL);
 #endif
+    // Graceful close: signal we're done writing, then drain any
+    // remaining data so close() sends FIN instead of RST.
+    shutdown(fd, SHUT_WR);
+    char drain[4096];
+    while (recv(fd, drain, sizeof(drain), 0) > 0)
+        ;
     close(fd);
     connections_.erase(fd);
     std::cout << "Client disconnected..." << std::endl;
@@ -177,7 +184,9 @@ void Server::handleClient(Event& event) {
         conn.state == READING_CHUNKS ||
         conn.state == READING_CHUNK_SIZE ||
         conn.state == READING_CHUNK_DATA ||
-        conn.state == READING_CHUNK_CRLF)
+        conn.state == READING_CHUNK_CRLF ||
+        conn.state == CGI_WRITING_BODY ||
+        conn.state == CGI_BUFFERING_TO_FILE)
         processBody(conn);
 }
 
@@ -309,14 +318,11 @@ void Server::startBodyReading(Connection& conn, size_t endPos) {
 
         return;
     }
-    
+
     it = conn.req.headers.find("Content-Length");
 
     if (it == conn.req.headers.end())
         return sendError(BAD_REQUEST, conn);
-
-    conn.req.body.append(conn.recvBuffer.data(), endPos);
-    conn.recvBuffer.consume(endPos);
 
     conn.remainingBody = std::strtoul(it->second.c_str(), NULL, 10);
 
@@ -325,9 +331,43 @@ void Server::startBodyReading(Connection& conn, size_t endPos) {
     if (location.hasClientMaxBodySize &&
         conn.remainingBody > location.clientMaxBodySize)
     {
+        conn.recvBuffer.consume(endPos);
         return sendError(PAYLOAD_TOO_LARGE, conn);
     }
 
+    // For CGI requests with large bodies, buffer to temp file
+    // to avoid holding everything in memory.
+    std::string path = conn.req.path;
+    resolvePath(path, location);
+    conn.req.path = path;
+    conn.res.path = path;
+    std::string cgiPath = findCGI(path, location.cgi);
+    if (!cgiPath.empty()) {
+        conn.recvBuffer.consume(endPos);
+        conn.cgiExecPath = cgiPath;
+
+        if (conn.remainingBody > 1024 * 1024) {
+            // Large body: write to temp file, start CGI after
+            char tmpl[] = "/tmp/webserv_cgi_XXXXXX";
+            int tmpFd = mkstemp(tmpl);
+            if (tmpFd < 0)
+                return sendError(SERVER_ERROR, conn);
+            conn.cgiBodyTmpFd = tmpFd;
+            conn.cgiBodyTmpPath = tmpl;
+            conn.state = CGI_BUFFERING_TO_FILE;
+            return;
+        }
+
+        // Small body: stream directly to CGI
+        std::cout << "Running cgi (streaming)\n";
+        conn.cgiWritePos = 0;
+        runCGI(cgiPath.c_str(), conn);
+        return;
+    }
+
+    // Non-CGI: keep headers in body for re-parsing in finishBody
+    conn.req.body.append(conn.recvBuffer.data(), endPos);
+    conn.recvBuffer.consume(endPos);
     conn.state = READING_BODY;
 }
 
@@ -389,20 +429,70 @@ void Server::processChunkedBody(Connection& conn) {
 }
 
 void Server::processBody(Connection& conn) {
-    LocationConfig& location = conn.location; 
+    LocationConfig& location = conn.location;
 
     if (conn.state == READING_CHUNKS ||
         conn.state == READING_CHUNK_SIZE ||
         conn.state == READING_CHUNK_DATA ||
         conn.state == READING_CHUNK_CRLF)
     {
-        if (location.clientMaxBodySize > 0 && 
+        if (location.clientMaxBodySize > 0 &&
             conn.req.body.size() - conn.headerSize > location.clientMaxBodySize) {
             sendError(PAYLOAD_TOO_LARGE, conn);
             return;
         }
 
         processChunkedBody(conn);
+        return;
+    }
+
+    // CGI large body: write incoming data to temp file
+    if (conn.state == CGI_BUFFERING_TO_FILE) {
+        size_t available = conn.recvBuffer.size();
+        if (available == 0)
+            return;
+
+        size_t toWrite = std::min(available, conn.remainingBody);
+        ssize_t n = write(conn.cgiBodyTmpFd, conn.recvBuffer.data(), toWrite);
+
+        if (n > 0) {
+            conn.recvBuffer.consume(n);
+            conn.remainingBody -= n;
+        } else if (n < 0) {
+            close(conn.cgiBodyTmpFd);
+            unlink(conn.cgiBodyTmpPath.c_str());
+            conn.cgiBodyTmpFd = -1;
+            sendError(SERVER_ERROR, conn);
+            return;
+        }
+
+        if (conn.remainingBody == 0) {
+            // Body fully written to file — rewind for reading
+            lseek(conn.cgiBodyTmpFd, 0, SEEK_SET);
+
+            if (cgiProcesses_.size() >= 5) {
+                // Queue until a CGI slot opens
+                cgiQueue_.push_back(conn.fd);
+                return;
+            }
+            std::cout << "CGI body buffered to file, starting cgi\n";
+            conn.cgiWritePos = 0;
+            runCGI(conn.cgiExecPath.c_str(), conn);
+        }
+        return;
+    }
+
+    // CGI streaming: body piped by handleCGIWrite (epoll-driven).
+    // Here we only drain if cgiStdin was already closed.
+    if (conn.state == CGI_WRITING_BODY) {
+        if (conn.cgiStdin < 0) {
+            size_t available = conn.recvBuffer.size();
+            size_t toDrain = std::min(available, conn.remainingBody);
+            conn.recvBuffer.consume(toDrain);
+            conn.remainingBody -= toDrain;
+            if (conn.remainingBody == 0)
+                conn.state = CGI_READING_OUTPUT;
+        }
         return;
     }
 
@@ -463,6 +553,7 @@ void Server::acceptConnection() {
         conn.state = READING_HEADERS;
         conn.lastActivityTime = std::time(NULL);
         conn.cgiHeaderSent = false;
+        conn.cgiBodyTmpFd = -1;
         std::cout << "New connection..." << std::endl;
     }
 }
@@ -512,14 +603,30 @@ void Server::checkCGIProcesses() {
         pid_t result = waitpid(it->pid, &status, WNOHANG);
 
         if (result > 0) {
-            // child exited, handle remaining CGI output
             handleCGIRead(*(it->conn));
-
-            // erase from vector and update iterator
             it = cgiProcesses_.erase(it);
         } else {
             ++it;
         }
+    }
+}
+
+void Server::startQueuedCGIs() {
+    while (!cgiQueue_.empty() && cgiProcesses_.size() < 5) {
+        int fd = cgiQueue_.front();
+        cgiQueue_.erase(cgiQueue_.begin());
+
+        std::map<int, Connection>::iterator it = connections_.find(fd);
+        if (it == connections_.end())
+            continue;
+
+        Connection& conn = it->second;
+        if (conn.state != CGI_BUFFERING_TO_FILE)
+            continue;
+
+        std::cout << "Starting queued cgi from file\n";
+        conn.cgiWritePos = 0;
+        runCGI(conn.cgiExecPath.c_str(), conn);
     }
 }
 
@@ -543,6 +650,7 @@ void Server::loop() {
 
         checkTimeOuts();
         checkCGIProcesses();
+        startQueuedCGIs();
         if (evCount < 0)
             continue;
 

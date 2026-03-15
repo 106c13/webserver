@@ -253,6 +253,7 @@ void ConfigParser::parseLocation(ServerConfig& server) {
 		} else if (directive == "clientMaxBodySize") {
 			next();
 			location.clientMaxBodySize = parseSize(current().value);
+			location.hasClientMaxBodySize = true;
 			expect(TOK_WORD, "Expected size value");
 			expect(TOK_SEMICOLON, "Expected ';' after clientMaxBodySize");
 		} else if (directive == "hasClientMaxBodySize") {

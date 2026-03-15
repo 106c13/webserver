@@ -33,8 +33,11 @@ char** Server::createEnvironment(const Request& req) {
     env[i++] = strdup(serverPort.c_str());
 
     if (req.method == "POST") {
-        std::string contentLength = "CONTENT_LENGTH=" + toString(req.body.size());
-        env[i++] = strdup(contentLength.c_str());
+        std::map<std::string,std::string>::const_iterator itCL = req.headers.find("Content-Length");
+        if (itCL != req.headers.end()) {
+            std::string contentLength = "CONTENT_LENGTH=" + itCL->second;
+            env[i++] = strdup(contentLength.c_str());
+        }
 
         std::map<std::string,std::string>::const_iterator itType = req.headers.find("Content-Type");
         if (itType != req.headers.end()) {
@@ -117,9 +120,13 @@ int Server::runCGI(const char* cgiPath, Connection& conn) {
     close(stdinPipe[0]);
     close(stdoutPipe[1]);
 
-    // Set non-blocking
+    // Set non-blocking and increase pipe buffer for throughput
     fcntl(stdinPipe[1], F_SETFL, O_NONBLOCK);
     fcntl(stdoutPipe[0], F_SETFL, O_NONBLOCK);
+#ifdef __linux__
+    fcntl(stdinPipe[1], F_SETPIPE_SZ, 1048576);
+    fcntl(stdoutPipe[0], F_SETPIPE_SZ, 1048576);
+#endif
 
     // Store pipe fds in connection
     conn.cgiPid = pid;
@@ -201,7 +208,77 @@ void Server::closeCgiFd(int& fd) {
 }
 
 void Server::handleCGIWrite(Connection& conn) {
-    //std::cout << "Called write\n";
+    // Streaming mode: pipe recvBuffer data to cgiStdin
+    if (conn.remainingBody > 0) {
+        size_t available = conn.recvBuffer.size();
+        if (available == 0)
+            return;
+
+        size_t toWrite = std::min(available, conn.remainingBody);
+        ssize_t n = write(conn.cgiStdin, conn.recvBuffer.data(), toWrite);
+
+        if (n > 0) {
+            conn.recvBuffer.consume(n);
+            conn.remainingBody -= n;
+            if (conn.remainingBody == 0) {
+                closeCgiFd(conn.cgiStdin);
+                conn.state = CGI_READING_OUTPUT;
+            }
+        } else if (n < 0 && errno == EPIPE) {
+            closeCgiFd(conn.cgiStdin);
+            conn.recvBuffer.clear();
+            conn.remainingBody = 0;
+            conn.state = CGI_READING_OUTPUT;
+        } else if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+            log(ERROR, "CGI stdin write failed");
+            closeCgiFd(conn.cgiStdin);
+            sendError(SERVER_ERROR, conn);
+        }
+        return;
+    }
+
+    // File-buffered or req.body mode: read from temp file or req.body
+    if (conn.cgiBodyTmpFd >= 0) {
+        // Read chunk from temp file, write to cgiStdin
+        char buf[65536];
+        ssize_t nRead = read(conn.cgiBodyTmpFd, buf, sizeof(buf));
+
+        if (nRead <= 0) {
+            // Done or error — close temp file and cgiStdin
+            close(conn.cgiBodyTmpFd);
+            unlink(conn.cgiBodyTmpPath.c_str());
+            conn.cgiBodyTmpFd = -1;
+            closeCgiFd(conn.cgiStdin);
+            conn.state = CGI_READING_OUTPUT;
+            return;
+        }
+
+        ssize_t nWrite = write(conn.cgiStdin, buf, nRead);
+        if (nWrite > 0) {
+            // If partial write, seek back the unwritten portion
+            if (nWrite < nRead)
+                lseek(conn.cgiBodyTmpFd, nWrite - nRead, SEEK_CUR);
+        } else if (nWrite < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            // Pipe full, rewind what we read
+            lseek(conn.cgiBodyTmpFd, -nRead, SEEK_CUR);
+        } else if (nWrite < 0 && errno == EPIPE) {
+            close(conn.cgiBodyTmpFd);
+            unlink(conn.cgiBodyTmpPath.c_str());
+            conn.cgiBodyTmpFd = -1;
+            closeCgiFd(conn.cgiStdin);
+            conn.state = CGI_READING_OUTPUT;
+        } else if (nWrite < 0) {
+            log(ERROR, "CGI stdin write from file failed");
+            close(conn.cgiBodyTmpFd);
+            unlink(conn.cgiBodyTmpPath.c_str());
+            conn.cgiBodyTmpFd = -1;
+            closeCgiFd(conn.cgiStdin);
+            sendError(SERVER_ERROR, conn);
+        }
+        return;
+    }
+
+    // Small body buffered in req.body
     Request& req = conn.req;
 
     if (conn.cgiWritePos >= req.body.size()) {
@@ -210,7 +287,7 @@ void Server::handleCGIWrite(Connection& conn) {
     }
 
     size_t remaining = req.body.size() - conn.cgiWritePos;
-    size_t chunk = remaining > 1024 ? 1024 : remaining;
+    size_t chunk = remaining > 65536 ? 65536 : remaining;
 
     ssize_t n = write(
         conn.cgiStdin,
@@ -222,7 +299,6 @@ void Server::handleCGIWrite(Connection& conn) {
         conn.cgiWritePos += n;
 
         if (conn.cgiWritePos >= req.body.size()) {
-            //std::cout << "Close write\n";
             closeCgiFd(conn.cgiStdin);
             conn.state = CGI_READING_OUTPUT;
         }

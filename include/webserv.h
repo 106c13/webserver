@@ -50,8 +50,9 @@ enum ConnState {
     SENDING_RESPONSE = 57,
     TIMEOUT = 58,
     CLOSED = 59,
-	CGI_READING_OUTPUT = 58,
-	CGI_WRITING_BODY = 57
+    CGI_READING_OUTPUT = 60,
+    CGI_WRITING_BODY = 61,
+    CGI_BUFFERING_TO_FILE = 62
 };
 
 struct Connection {
@@ -80,6 +81,9 @@ struct Connection {
 	bool		cgiHeaderSent;
 
 	std::string cgiRawOutput;
+	std::string	cgiExecPath;
+	std::string	cgiBodyTmpPath;
+	int			cgiBodyTmpFd;
 
 	int			headerSize;
 
@@ -111,6 +115,7 @@ class	Server {
 		std::map<int, Connection>	connections_;
 		std::map<int, Connection*>	cgiFdMap_;
 		std::vector<CGIProcess>		cgiProcesses_;
+		std::vector<int>			cgiQueue_;
 		int							serverFd_;
 		int							epollFd_;
 		sockaddr_in					addr_;
@@ -141,6 +146,7 @@ class	Server {
 		void			startBodyReading(Connection& conn, size_t endPos);
 		void			handleSimpleRequest(Connection& conn, size_t endPos);
 		bool			validateRequest(Connection& conn);
+		bool			handleMultipartUpload(Connection& conn, LocationConfig& location);
 		void			processHeaders(Connection& conn);
 		void			checkTimeOuts();
 
@@ -148,6 +154,7 @@ class	Server {
 		void			handleCGIWrite(Connection& conn);
 		void			closeCgiFd(int& fd);
 		void			checkCGIProcesses();
+		void			startQueuedCGIs();
 
 	public:
 		Server(const ServerConfig& config); // Start server with configurations from file
