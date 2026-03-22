@@ -36,25 +36,25 @@ void Server::processHeaders(Connection& conn) {
 
     int status;
     
-    status = checkMethod(conn.req, con.location);
+    status = checkMethod(conn.req, conn.location);
     if (status != OK)
         return sendError(status, conn);
 
-    status = resolvePath(conn.req.path, con.location);
+    status = resolvePath(conn.req.path, conn.location);
     if (status == DIRECTORY_NO_INDEX && conn.location.autoindex)
-        return generateAutoindex(conn);
+        return generateAutoindex(conn, conn.location);
 
     if (status != OK)
         return sendError(status, conn);
-    
-    if (location.redirectCode != 0)
+
+    if (conn.location.redirectCode != 0)
         return sendRedirect(conn);
 
     if (conn.req.method == "GET")
         return handleGet(conn);
 
     if (conn.req.method == "DELETE")
-        return sendError(deleteResource(req.path), conn);
+        return sendError(deleteResource(conn.req.path), conn);
 
     return startBodyReading(conn);
 }
@@ -64,8 +64,8 @@ void Server::processHeaders(Connection& conn) {
 
 static void setupConnection(Connection& conn, int fd) {
 	conn.fd = fd;
-    conn.sendingFile = false;
-    conn.state = READING_HEADERS;
+    conn.fileFd = -1;
+    conn.state = READING_HEADER;
     conn.lastActivityTime = std::time(NULL);
 }
 
@@ -134,7 +134,7 @@ void Server::initSocket() {
 }
 
 void Server::checkCGIProcesses() {
-    std::vector<CGIProcess>::iterator it = cgiProcesses_.begin();
+    std::vector<CGI>::iterator it = cgiProcesses_.begin();
 
     while (it != cgiProcesses_.end()) {
         int status;

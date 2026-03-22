@@ -15,7 +15,7 @@
 #include <exception>
 #include <dirent.h>
 #include <cstddef>
-#include <cstring> 
+#include <cstring>
 #include <ctime>
 #include "ConfigParser.h"
 #include "RequestParser.h"
@@ -39,21 +39,9 @@ typedef struct kevent Event;
 #define EVENT_DEL EV_DELETE
 #endif
 
-enum BodySource {
-    BODY_FROM_MEMORY,
-    BODY_FROM_FILE,
-    BODY_DONE
-};
-
-enum DataTransfer {
-    FIXED,
-    CHUNKED
-};
-
 enum ConnState {
     READING_HEADER = 50,
     READING_BODY = 51,
-	SENDING_FILE = 50,
 
     READING_CHUNKS = 49,
     READING_CHUNK_SIZE = 48,
@@ -69,9 +57,28 @@ enum ConnState {
 };
 
 enum FileBufferState {
-	NOT_USED = 70;
-	USED = 71;
-}
+	NOT_USED = 70,
+	USED = 71
+};
+
+struct Connection;
+
+struct CGI {
+    pid_t		pid;
+	int			state;
+	int			stdinFd;
+	int			stdoutFd;
+	std::string	rawOutput;
+	Connection*	conn;
+
+    CGI() : pid(-1), state(0), stdinFd(-1), stdoutFd(-1), conn(NULL) {}
+    CGI(pid_t p, int s, int in, int out, Connection& c) :
+		pid(p),
+		state(s),
+		stdinFd(in),
+		stdoutFd(out),
+		conn(&c) {}
+};
 
 struct Connection {
     int         	fd;
@@ -79,7 +86,6 @@ struct Connection {
 
     Buffer			recvBuffer;
     Buffer			sendBuffer;
-	int				fileBuffer;
 
     Request			req;
     Response		res;
@@ -88,23 +94,10 @@ struct Connection {
 	time_t			lastActivityTime;
 
 	CGI*			cgi;
+	int				fileFd;
 
 	size_t chunkSize;
 	bool   hasChunkSize;
-};
-
-struct CGI {
-    pid_t		pid;
-	int			state;
-	int			Stdin;
-	int			Stdout;
-
-    CGIProcess(pid_t p, int s, int in, int out, Connection& c) :
-		pid(p),
-		state(s),
-		cgiStdin(in),
-		cgiStdout(out),
-		conn(&c) {}
 };
 
 
@@ -124,7 +117,7 @@ class	Server {
 		// variables
 		std::map<int, Connection>	connections_;
 		std::map<int, Connection*>	cgiFdMap_;
-		std::vector<CGIProcess>		cgiProcesses_;
+		std::vector<CGI>			cgiProcesses_;
 		std::vector<int>			cgiQueue_;
 		int							serverFd_;
 		int							epollFd_;
@@ -135,37 +128,41 @@ class	Server {
 		void			handleClient(Event& event);
 		void			handleRead(Connection& conn);
 		void			handleWrite(Connection& conn);
+		void			addEvent(int fd, bool wantRead, bool wantWrite);
 		void			modifyToWrite(int fd);
 		void			modifyToRead(int fd);
 		void			closeConnection(int fd);
-		int				runCGI(const char* cgiPath, Connection& conn);
-		void			sendCGIOutput(Connection& conn, int cgiFd);
-		void			handleRequest(Connection& conn);
+		void			runCGI(const char* cgiPath, Connection& conn);
 		int				resolvePath(std::string& path, LocationConfig& location);
 		LocationConfig&	resolveLocation(std::string& fs_path);
 		void			generateAutoindex(Connection& conn, LocationConfig& location);
-		void			sendRedirect(Connection& conn, const LocationConfig& location);
+		void			sendRedirect(Connection& conn);
 		bool			prepareFileResponse(Connection& conn, const std::string& path);
 		bool			streamFileChunk(Connection& conn);
 		void			sendError(int code, Connection& conn);
 		char**			createEnvironment(const Request& req);
-		
+
 		void			finishBody(Connection& conn);
 		void			processBody(Connection& conn);
+		void			processFixedBody(Connection& conn);
 		void			processChunkedBody(Connection& conn);
-		void			startBodyReading(Connection& conn, size_t endPos);
+		void			startBodyReading(Connection& conn);
 		bool			handleMultipartUpload(Connection& conn, LocationConfig& location);
 		void			processHeaders(Connection& conn);
 		void			checkTimeOuts();
+		void			handleGet(Connection& conn);
 
 		void			handleCGIRead(Connection& conn);
 		void			handleCGIWrite(Connection& conn);
+		void			cgiWriteFromStream(Connection& conn);
+		void			cgiWriteFromMemory(Connection& conn);
+		void			cgiWriteFromFile(Connection& conn);
 		void			closeCgiFd(int& fd);
 		void			checkCGIProcesses();
 		void			startQueuedCGIs();
 
 	public:
-		Server(const ServerConfig& config); // Start server with configurations from file
+		Server(const ServerConfig& config);
 		~Server();
 
 		void		loop();
@@ -180,4 +177,7 @@ std::string				readFile(const std::string& filename);
 std::vector<DirEntry>	listDirectory(const std::string& path);
 std::string				toString(size_t n);
 std::string				findCGI(const std::string& fileName, const StringMap& cgiMap);
+int						deleteResource(const std::string& path);
+bool					requestComplete(const Buffer& buf, size_t& endPos);
+int						checkMethod(const Request& req, const LocationConfig& location);
 #endif

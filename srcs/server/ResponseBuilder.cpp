@@ -53,7 +53,6 @@ bool Server::streamFileChunk(Connection& conn) {
 
     close(conn.fileFd);
     conn.fileFd      = -1;
-    conn.sendingFile = false;
     conn.state       = SENDING_RESPONSE;
     return false;
 }

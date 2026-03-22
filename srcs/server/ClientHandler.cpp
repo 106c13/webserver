@@ -4,8 +4,6 @@
 
 void Server::handleRead(Connection& conn) {
     conn.lastActivityTime = std::time(NULL);
-    // When streaming body to CGI, cap the recv buffer to avoid
-    // accumulating the entire request body in memory.
     size_t readSize;
     if (conn.state == CGI_WRITING_BODY || conn.state == CGI_BUFFERING_TO_FILE) {
         if (conn.recvBuffer.size() > BUFFER_SIZE * 16)
@@ -38,20 +36,17 @@ void Server::handleWrite(Connection& conn) {
     }
 
     if (conn.state == SENDING_RESPONSE) {
-        if (conn.sendBuffer.empty() && !conn.sendingFile) {
+        if (conn.sendBuffer.empty() && conn.fileFd < 0) {
             conn.state = CLOSED;
             return;
         }
     }
 
-    if (conn.sendingFile) {
+    if (conn.fileFd >= 0)
         streamFileChunk(conn);
-    }
-    
-    if (conn.sendBuffer.empty()) {
-        modifyToRead(conn.fd);
-    }
 
+    if (conn.sendBuffer.empty())
+        modifyToRead(conn.fd);
 }
 
 void Server::handleClient(Event& event) {
@@ -66,14 +61,12 @@ void Server::handleClient(Event& event) {
 #ifdef __linux__
     if (event.events & EPOLLIN)
         handleRead(conn);
-
     if (event.events & EPOLLOUT)
         handleWrite(conn);
 #elif __APPLE__
-    if (event.events & EVFILT_READ)
+    if (event.filter == EVFILT_READ)
         handleRead(conn);
-
-    if (event.events & EVFILT_WRITE)
+    if (event.filter == EVFILT_WRITE)
         handleWrite(conn);
 #endif
 
@@ -83,6 +76,9 @@ void Server::handleClient(Event& event) {
     if (conn.state == READING_HEADER)
         processHeaders(conn);
 
-    if (conn.state == READING_BODY)
-        proceccBody(conn);
+    if (conn.state == READING_BODY
+        || conn.state == READING_CHUNK_SIZE
+        || conn.state == READING_CHUNK_DATA
+        || conn.state == READING_CHUNK_CRLF)
+        processBody(conn);
 }

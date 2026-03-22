@@ -34,6 +34,17 @@ struct MultipartPart {
 	MultipartPart();
 };
 
+enum BodySource {
+	BODY_FROM_MEMORY,
+	BODY_FROM_FILE,
+	BODY_DONE
+};
+
+enum DataTransfer {
+	FIXED,
+	CHUNKED
+};
+
 struct Request {
 	std::string							method;
 	std::string							uri;
@@ -46,6 +57,10 @@ struct Request {
 	std::string							body;
 	size_t								bodySize;
 	size_t								bodySent;
+	size_t								bodyReceived;
+	int									transferType;
+	int									fileBuffer;
+	std::string							tempFilePath;
 	BodySource							bodySource;
 	std::vector<Cookie>					cookies;
 	std::vector<SetCookie>				setCookies;
@@ -53,6 +68,8 @@ struct Request {
 	std::string							boundary;
 	Request();
 };
+
+void parseMultipart(Request& req);
 
 class RequestParser {
 public:

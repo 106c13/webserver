@@ -19,7 +19,13 @@ MultipartPart::MultipartPart() {
 }
 
 /* Request */
-Request::Request() {
+Request::Request()
+	: bodySize(0),
+	  bodySent(0),
+	  bodyReceived(0),
+	  transferType(FIXED),
+	  fileBuffer(-1),
+	  bodySource(BODY_FROM_MEMORY) {
 }
 
 /* Class management */

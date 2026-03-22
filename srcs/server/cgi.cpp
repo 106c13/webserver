@@ -1,14 +1,14 @@
 #include <string.h>
 #include <sstream>
 #include <unistd.h>
-#include <fcntl.h> 
+#include <fcntl.h>
 #include <errno.h>
 #include <sys/wait.h>
 #include "defines.h"
 #include "webserv.h"
 
 char** Server::createEnvironment(const Request& req) {
-    char** env = new char*[64]; 
+    char** env = new char*[64];
     int i = 0;
 
     std::string method = "REQUEST_METHOD=" + req.method;
@@ -70,7 +70,6 @@ char** Server::createEnvironment(const Request& req) {
         envVar += "=" + it->second;
 
         env[i++] = strdup(envVar.c_str());
-        std::cout << env[i - 1] << std::endl;
     }
 
     env[i] = NULL;
@@ -83,13 +82,13 @@ void Server::runCGI(const char* cgiPath, Connection& conn) {
 
     if (pipe(stdinPipe) < 0 || pipe(stdoutPipe) < 0) {
         log(ERROR, "PIPE ERROR");
-        return -1;
+        return sendError(SERVER_ERROR, conn);
     }
 
     pid_t pid = fork();
     if (pid < 0) {
         log(ERROR, "FORK ERROR");
-        return -1;
+        return sendError(SERVER_ERROR, conn);
     }
 
     if (pid == 0) {
@@ -119,14 +118,15 @@ void Server::runCGI(const char* cgiPath, Connection& conn) {
     fcntl(stdinPipe[1], F_SETFL, O_NONBLOCK);
     fcntl(stdoutPipe[0], F_SETFL, O_NONBLOCK);
 
+    conn.cgi = new CGI(pid, CGI_WRITING_BODY, stdinPipe[1], stdoutPipe[0], conn);
+
     cgiFdMap_[stdinPipe[1]] = &conn;
     cgiFdMap_[stdoutPipe[0]] = &conn;
 
-    CGIProcess proc(pid, DEFAULT, stdinPipe[1], stdoutPipe[0], conn);
-    cgiProcesses_.push_back(proc);
-    
-    addEvent(conn.cgiStdin, false, true);
-    addEvent(conn.cgiStdout, true, false);
+    cgiProcesses_.push_back(*conn.cgi);
+
+    addEvent(conn.cgi->stdinFd, false, true);
+    addEvent(conn.cgi->stdoutFd, true, false);
 }
 
 std::string findCGI(const std::string& fileName, const StringMap& cgiMap) {
@@ -144,9 +144,8 @@ std::string findCGI(const std::string& fileName, const StringMap& cgiMap) {
 
 	std::map<std::string, std::string>::const_iterator it = cgiMap.find(extension);
 
-	if (it == cgiMap.end()) {
+	if (it == cgiMap.end())
 		return "";
-    }
 
 	return it->second;
 }
@@ -169,77 +168,154 @@ void Server::closeCgiFd(int& fd) {
     fd = -1;
 }
 
-void Server::handleCGIWrite(Connection& conn) {
+void Server::cgiWriteFromStream(Connection& conn) {
     Request& req = conn.req;
     CGI* cgi = conn.cgi;
 
-    size_t remaining = req.bodySize - req.bodySent;
+    if (conn.recvBuffer.empty())
+        return;
 
-    if (remaining > BUFF_SIZE)
-        remaining = BUFF_SIZE;
+    size_t remaining = req.bodySize - req.bodyReceived;
+    size_t available = conn.recvBuffer.size();
+    size_t toWrite = available < remaining ? available : remaining;
+    if (toWrite > BUFFER_SIZE)
+        toWrite = BUFFER_SIZE;
 
-    ssize_t n = write(cgi->Stdin,
-                     req.body.c_str() + req.bodySent,
-                     remaining);
-    
+    ssize_t n = write(cgi->stdinFd, conn.recvBuffer.data(), toWrite);
+
     if (n > 0) {
-        req.bodySent += n;
+        conn.recvBuffer.consume(n);
+        req.bodyReceived += n;
 
-        if (req.bodySent >= req.bodySize)
-            return closeCgiFd(cgi->cgiStdin);
+        if (req.bodyReceived >= req.bodySize) {
+            closeCgiFd(cgi->stdinFd);
+            conn.state = CGI_READING_OUTPUT;
+        }
+        return;
     }
 
-    if (n == -1) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK)
-            return;
-
-        log(ERROR, "CGI write failed");
-            return closeCgiFd(cgi->cgiStdin);
+    if (n == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
+        log(ERROR, "CGI stream write failed");
+        closeCgiFd(cgi->stdinFd);
+        sendError(SERVER_ERROR, conn);
     }
 }
 
+void Server::cgiWriteFromMemory(Connection& conn) {
+    Request& req = conn.req;
+    CGI* cgi = conn.cgi;
+
+    size_t remaining = req.body.size() - req.bodySent;
+    if (remaining > BUFFER_SIZE)
+        remaining = BUFFER_SIZE;
+
+    ssize_t n = write(cgi->stdinFd,
+                     req.body.c_str() + req.bodySent,
+                     remaining);
+
+    if (n > 0) {
+        req.bodySent += n;
+        if (req.bodySent >= req.body.size()) {
+            closeCgiFd(cgi->stdinFd);
+            conn.state = CGI_READING_OUTPUT;
+        }
+        return;
+    }
+
+    if (n == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
+        log(ERROR, "CGI memory write failed");
+        closeCgiFd(cgi->stdinFd);
+        sendError(SERVER_ERROR, conn);
+    }
+}
+
+void Server::cgiWriteFromFile(Connection& conn) {
+    Request& req = conn.req;
+    CGI* cgi = conn.cgi;
+
+    char buf[BUFFER_SIZE];
+    ssize_t bytesRead = read(req.fileBuffer, buf, BUFFER_SIZE);
+
+    if (bytesRead > 0) {
+        ssize_t n = write(cgi->stdinFd, buf, bytesRead);
+        if (n > 0) {
+            req.bodySent += n;
+            if (req.bodySent >= req.bodyReceived) {
+                closeCgiFd(cgi->stdinFd);
+                conn.state = CGI_READING_OUTPUT;
+            }
+            return;
+        }
+        if (n == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
+            log(ERROR, "CGI file write failed");
+            closeCgiFd(cgi->stdinFd);
+            sendError(SERVER_ERROR, conn);
+        }
+        return;
+    }
+
+    if (bytesRead == 0) {
+        closeCgiFd(cgi->stdinFd);
+        conn.state = CGI_READING_OUTPUT;
+        return;
+    }
+
+    if (errno != EAGAIN && errno != EWOULDBLOCK) {
+        log(ERROR, "CGI file read failed");
+        closeCgiFd(cgi->stdinFd);
+        sendError(SERVER_ERROR, conn);
+    }
+}
+
+void Server::handleCGIWrite(Connection& conn) {
+    if (conn.req.transferType == FIXED && conn.state == CGI_WRITING_BODY
+        && conn.req.bodyReceived < conn.req.bodySize)
+        return cgiWriteFromStream(conn);
+
+    if (conn.req.bodySource == BODY_FROM_FILE)
+        return cgiWriteFromFile(conn);
+
+    return cgiWriteFromMemory(conn);
+}
+
 void Server::handleCGIRead(Connection& conn) {
+    CGI* cgi = conn.cgi;
     char buf[BUFFER_SIZE];
 
     while (true) {
-        ssize_t n = read(conn.cgiStdout, buf, BUFFER_SIZE);
-        //std::cout << n << std::endl;
-        if (n > 0) {
-            // Append everything to temporary CGI output buffer
-            conn.cgiRawOutput.append(buf, n);
+        ssize_t n = read(cgi->stdoutFd, buf, BUFFER_SIZE);
 
+        if (n > 0) {
+            cgi->rawOutput.append(buf, n);
             return;
         }
 
         if (n == 0) {
-            //std::cout << "In n = 0\n";
-            // EOF → CGI finished
-            closeCgiFd(conn.cgiStdout);
+            closeCgiFd(cgi->stdoutFd);
 
             int status;
-            waitpid(conn.cgiPid, &status, WNOHANG);
+            waitpid(cgi->pid, &status, WNOHANG);
 
-            // Now parse CGI headers and prepare sendBuffer
-            size_t headerEnd = conn.cgiRawOutput.find("\r\n\r\n");
+            size_t headerEnd = cgi->rawOutput.find("\r\n\r\n");
             std::string cgiHeaders;
             std::string body;
 
             if (headerEnd != std::string::npos) {
-                cgiHeaders = conn.cgiRawOutput.substr(0, headerEnd);
-                body = conn.cgiRawOutput.substr(headerEnd + 4);
+                cgiHeaders = cgi->rawOutput.substr(0, headerEnd);
+                body = cgi->rawOutput.substr(headerEnd + 4);
             } else {
-                body = conn.cgiRawOutput; // no headers
+                body = cgi->rawOutput;
             }
 
             Response& res = conn.res;
-            res.status = OK;           // default
+            res.status = OK;
             res.contentType = "text/html";
 
             std::istringstream stream(cgiHeaders);
             std::string line;
             while (std::getline(stream, line)) {
                 if (!line.empty() && line[line.size()-1] == '\r')
-                    line.resize(line.size()-1); // old-style pop_back
+                    line.resize(line.size()-1);
 
                 if (line.find("Status:") == 0)
                     res.status = atoi(line.substr(7).c_str());
@@ -249,33 +325,29 @@ void Server::handleCGIRead(Connection& conn) {
                     res.location = line.substr(10);
             }
 
-            // Set Content-Length now, because we have full body
             res.contentLength = toString(body.size());
 
-            // Generate HTTP header
             std::string header = generateHeader(res);
-            std::cout << header;
-            // Fill sendBuffer with header + body
             conn.sendBuffer.append(header);
             conn.sendBuffer.append(body);
 
-            // Switch to sending response
             conn.state = SENDING_RESPONSE;
             modifyToWrite(conn.fd);
 
-            conn.cgiRawOutput.clear();
+            cgi->rawOutput.clear();
             return;
         }
 
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            // No more data ready for now, return and wait for epoll
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
             return;
-        }
 
-        // Any other read error
         log(ERROR, "CGI stdout read failed");
-        closeCgiFd(conn.cgiStdout);
+        closeCgiFd(cgi->stdoutFd);
         sendError(SERVER_ERROR, conn);
         return;
     }
+}
+
+void Server::startQueuedCGIs() {
+    // TODO: implement CGI queue processing if needed
 }
