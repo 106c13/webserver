@@ -153,6 +153,8 @@ class	Server {
 		void			handleGet(Connection& conn);
 
 		void			handleCGIRead(Connection& conn);
+		void			parseCGIHeaders(const std::string& cgiHeaders, Response& res);
+		void			buildCGIResponse(Connection& conn);
 		void			handleCGIWrite(Connection& conn);
 		void			cgiWriteFromStream(Connection& conn);
 		void			cgiWriteFromMemory(Connection& conn);

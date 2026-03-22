@@ -141,7 +141,8 @@ void Server::checkCGIProcesses() {
         pid_t result = waitpid(it->pid, &status, WNOHANG);
 
         if (result > 0) {
-            handleCGIRead(*(it->conn));
+            if (it->conn && it->conn->cgi && it->conn->cgi->stdoutFd != -1)
+                handleCGIRead(*(it->conn));
             it = cgiProcesses_.erase(it);
         } else {
             ++it;

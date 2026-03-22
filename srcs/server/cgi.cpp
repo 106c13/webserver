@@ -120,12 +120,19 @@ void Server::runCGI(const char* cgiPath, Connection& conn) {
 
     conn.cgi = new CGI(pid, CGI_WRITING_BODY, stdinPipe[1], stdoutPipe[0], conn);
 
-    cgiFdMap_[stdinPipe[1]] = &conn;
     cgiFdMap_[stdoutPipe[0]] = &conn;
-
     cgiProcesses_.push_back(*conn.cgi);
 
-    addEvent(conn.cgi->stdinFd, false, true);
+    if (conn.req.method == "GET" || conn.req.method == "DELETE") {
+        close(stdinPipe[1]);
+        conn.cgi->stdinFd = -1;
+        conn.state = CGI_READING_OUTPUT;
+    } else {
+        cgiFdMap_[stdinPipe[1]] = &conn;
+        addEvent(conn.cgi->stdinFd, false, true);
+        conn.state = CGI_WRITING_BODY;
+    }
+
     addEvent(conn.cgi->stdoutFd, true, false);
 }
 
@@ -278,8 +285,63 @@ void Server::handleCGIWrite(Connection& conn) {
     return cgiWriteFromMemory(conn);
 }
 
+void Server::parseCGIHeaders(const std::string& cgiHeaders, Response& res) {
+    res.status = OK;
+    res.contentType = "text/html";
+
+    std::istringstream stream(cgiHeaders);
+    std::string line;
+    while (std::getline(stream, line)) {
+        if (!line.empty() && line[line.size()-1] == '\r')
+            line.resize(line.size()-1);
+
+        if (line.find("Status:") == 0)
+            res.status = atoi(line.substr(7).c_str());
+        else if (line.find("Content-Type:") == 0)
+            res.contentType = line.substr(13);
+        else if (line.find("Location:") == 0)
+            res.location = line.substr(10);
+    }
+}
+
+void Server::buildCGIResponse(Connection& conn) {
+    CGI* cgi = conn.cgi;
+
+    closeCgiFd(cgi->stdoutFd);
+
+    int status;
+    waitpid(cgi->pid, &status, WNOHANG);
+
+    std::string cgiHeaders;
+    std::string body;
+
+    size_t headerEnd = cgi->rawOutput.find("\r\n\r\n");
+    if (headerEnd != std::string::npos) {
+        cgiHeaders = cgi->rawOutput.substr(0, headerEnd);
+        body = cgi->rawOutput.substr(headerEnd + 4);
+    } else {
+        body = cgi->rawOutput;
+    }
+
+    parseCGIHeaders(cgiHeaders, conn.res);
+    conn.res.contentLength = toString(body.size());
+
+    std::string header = generateHeader(conn.res);
+    conn.sendBuffer.append(header);
+    conn.sendBuffer.append(body);
+
+    conn.state = SENDING_RESPONSE;
+    modifyToWrite(conn.fd);
+
+    cgi->rawOutput.clear();
+}
+
 void Server::handleCGIRead(Connection& conn) {
     CGI* cgi = conn.cgi;
+
+    if (!cgi || cgi->stdoutFd == -1)
+        return;
+
     char buf[BUFFER_SIZE];
 
     while (true) {
@@ -290,53 +352,8 @@ void Server::handleCGIRead(Connection& conn) {
             return;
         }
 
-        if (n == 0) {
-            closeCgiFd(cgi->stdoutFd);
-
-            int status;
-            waitpid(cgi->pid, &status, WNOHANG);
-
-            size_t headerEnd = cgi->rawOutput.find("\r\n\r\n");
-            std::string cgiHeaders;
-            std::string body;
-
-            if (headerEnd != std::string::npos) {
-                cgiHeaders = cgi->rawOutput.substr(0, headerEnd);
-                body = cgi->rawOutput.substr(headerEnd + 4);
-            } else {
-                body = cgi->rawOutput;
-            }
-
-            Response& res = conn.res;
-            res.status = OK;
-            res.contentType = "text/html";
-
-            std::istringstream stream(cgiHeaders);
-            std::string line;
-            while (std::getline(stream, line)) {
-                if (!line.empty() && line[line.size()-1] == '\r')
-                    line.resize(line.size()-1);
-
-                if (line.find("Status:") == 0)
-                    res.status = atoi(line.substr(7).c_str());
-                else if (line.find("Content-Type:") == 0)
-                    res.contentType = line.substr(13);
-                else if (line.find("Location:") == 0)
-                    res.location = line.substr(10);
-            }
-
-            res.contentLength = toString(body.size());
-
-            std::string header = generateHeader(res);
-            conn.sendBuffer.append(header);
-            conn.sendBuffer.append(body);
-
-            conn.state = SENDING_RESPONSE;
-            modifyToWrite(conn.fd);
-
-            cgi->rawOutput.clear();
-            return;
-        }
+        if (n == 0)
+            return buildCGIResponse(conn);
 
         if (errno == EAGAIN || errno == EWOULDBLOCK)
             return;
