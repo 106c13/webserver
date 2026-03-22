@@ -3,20 +3,16 @@
 #include "webserv.h"
 #include "ConfigParser.h"
 
-// ── internal helper ──────────────────────────────────────────────────────────
-
 static void flushHeader(Connection& conn) {
     std::string header = generateHeader(conn.res);
     conn.sendBuffer.append(header);
     log(INFO, header.substr(0, header.find("\n")));
 }
 
-// ── Server methods ───────────────────────────────────────────────────────────
-
-void Server::sendRedirect(Connection& conn, const LocationConfig& location) {
+void Server::sendRedirect(Connection& conn) {
     Response& res = conn.res;
-    res.status        = location.redirectCode;
-    res.location      = location.redirectUrl;
+    res.status        = conn.location.redirectCode;
+    res.location      = conn.location.redirectUrl;
     res.contentLength = "0";
 
     flushHeader(conn);
@@ -40,7 +36,6 @@ bool Server::prepareFileResponse(Connection& conn, const std::string& path) {
     flushHeader(conn);
 
     conn.fileFd      = fd;
-    conn.sendingFile = true;
     return true;
 }
 

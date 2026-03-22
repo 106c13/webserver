@@ -167,7 +167,7 @@ void Server::sendError(int code, Connection& conn) {
 	std::cout << header;
     conn.sendBuffer.append(header);
     conn.sendBuffer.append(page, pageSize);
-	conn.state = SENDING_RESPONSE;
+	conn.state = SENDING_FILE;
 
     modifyToWrite(conn.fd);
 }

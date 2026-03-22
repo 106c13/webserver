@@ -39,62 +39,72 @@ typedef struct kevent Event;
 #define EVENT_DEL EV_DELETE
 #endif
 
-enum ConnState {
-    READING_HEADERS = 50,
-    READING_BODY = 51,
-    READING_CHUNKS = 52,
-    READING_CHUNK_SIZE = 53,
-    READING_CHUNK_DATA = 54,
-    READING_CHUNK_CRLF = 55,
-    PROCESSING = 56,
-    SENDING_RESPONSE = 57,
-    TIMEOUT = 58,
-    CLOSED = 59,
-    CGI_READING_OUTPUT = 60,
-    CGI_WRITING_BODY = 61,
-    CGI_BUFFERING_TO_FILE = 62
+enum BodySource {
+    BODY_FROM_MEMORY,
+    BODY_FROM_FILE,
+    BODY_DONE
 };
+
+enum DataTransfer {
+    FIXED,
+    CHUNKED
+};
+
+enum ConnState {
+    READING_HEADER = 50,
+    READING_BODY = 51,
+	SENDING_FILE = 50,
+
+    READING_CHUNKS = 49,
+    READING_CHUNK_SIZE = 48,
+    READING_CHUNK_DATA = 47,
+    READING_CHUNK_CRLF = 46,
+    PROCESSING = 45,
+    SENDING_RESPONSE = 44,
+    TIMEOUT = 43,
+    CLOSED = 42,
+    CGI_READING_OUTPUT = 41,
+    CGI_WRITING_BODY = 40,
+    CGI_BUFFERING_TO_FILE = 39
+};
+
+enum FileBufferState {
+	NOT_USED = 70;
+	USED = 71;
+}
 
 struct Connection {
-    int         fd;
+    int         	fd;
+	int				state;
 
-    Buffer		recvBuffer;
-    Buffer		sendBuffer;
+    Buffer			recvBuffer;
+    Buffer			sendBuffer;
+	int				fileBuffer;
 
-    Request		req;
-    Response	res;
-
-	int			fileFd;
-	bool		sendingFile;
-	
-	size_t		remainingBody;
-	int			state;
-
-	time_t		lastActivityTime;
-
-	size_t		currentChunkSize;
-
-	int			cgiStdout;
-	int			cgiStdin;
-	pid_t		cgiPid;
-	size_t		cgiWritePos;
-	bool		cgiHeaderSent;
-
-	std::string cgiRawOutput;
-	std::string	cgiExecPath;
-	std::string	cgiBodyTmpPath;
-	int			cgiBodyTmpFd;
-
-	int			headerSize;
-
+    Request			req;
+    Response		res;
 	LocationConfig	location;
+
+	time_t			lastActivityTime;
+
+	CGI*			cgi;
+
+	size_t chunkSize;
+	bool   hasChunkSize;
 };
 
-struct CGIProcess {
-    pid_t pid;
-    Connection* conn; 
+struct CGI {
+    pid_t		pid;
+	int			state;
+	int			Stdin;
+	int			Stdout;
 
-    CGIProcess(pid_t p, Connection& c) : pid(p), conn(&c) {}
+    CGIProcess(pid_t p, int s, int in, int out, Connection& c) :
+		pid(p),
+		state(s),
+		cgiStdin(in),
+		cgiStdout(out),
+		conn(&c) {}
 };
 
 
@@ -144,8 +154,6 @@ class	Server {
 		void			processBody(Connection& conn);
 		void			processChunkedBody(Connection& conn);
 		void			startBodyReading(Connection& conn, size_t endPos);
-		void			handleSimpleRequest(Connection& conn, size_t endPos);
-		bool			validateRequest(Connection& conn);
 		bool			handleMultipartUpload(Connection& conn, LocationConfig& location);
 		void			processHeaders(Connection& conn);
 		void			checkTimeOuts();

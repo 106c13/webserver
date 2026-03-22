@@ -77,18 +77,15 @@ char** Server::createEnvironment(const Request& req) {
     return env;
 }
 
-int Server::runCGI(const char* cgiPath, Connection& conn) {
+void Server::runCGI(const char* cgiPath, Connection& conn) {
     int stdinPipe[2];
     int stdoutPipe[2];
-
-    conn.state = CGI_WRITING_BODY;
 
     if (pipe(stdinPipe) < 0 || pipe(stdoutPipe) < 0) {
         log(ERROR, "PIPE ERROR");
         return -1;
     }
 
-    char** env = createEnvironment(conn.req);
     pid_t pid = fork();
     if (pid < 0) {
         log(ERROR, "FORK ERROR");
@@ -96,7 +93,6 @@ int Server::runCGI(const char* cgiPath, Connection& conn) {
     }
 
     if (pid == 0) {
-        // CHILD PROCESS
         dup2(stdinPipe[0], STDIN_FILENO);
         dup2(stdoutPipe[1], STDOUT_FILENO);
         dup2(stdoutPipe[1], STDERR_FILENO);
@@ -106,6 +102,7 @@ int Server::runCGI(const char* cgiPath, Connection& conn) {
         close(stdoutPipe[0]);
         close(stdoutPipe[1]);
 
+        char** env = createEnvironment(conn.req);
         char* argv[] = {
             const_cast<char*>(cgiPath),
             const_cast<char*>(conn.req.path.c_str()),
@@ -116,55 +113,20 @@ int Server::runCGI(const char* cgiPath, Connection& conn) {
         _exit(1);
     }
 
-    // PARENT PROCESS
     close(stdinPipe[0]);
     close(stdoutPipe[1]);
 
-    // Set non-blocking and increase pipe buffer for throughput
     fcntl(stdinPipe[1], F_SETFL, O_NONBLOCK);
     fcntl(stdoutPipe[0], F_SETFL, O_NONBLOCK);
-#ifdef __linux__
-    fcntl(stdinPipe[1], F_SETPIPE_SZ, 1048576);
-    fcntl(stdoutPipe[0], F_SETPIPE_SZ, 1048576);
-#endif
 
-    // Store pipe fds in connection
-    conn.cgiPid = pid;
-    conn.cgiStdin = stdinPipe[1];
-    conn.cgiStdout = stdoutPipe[0];
-    conn.cgiWritePos = 0;
+    cgiFdMap_[stdinPipe[1]] = &conn;
+    cgiFdMap_[stdoutPipe[0]] = &conn;
 
-    // Map pipe fds to connection for epoll
-    cgiFdMap_[conn.cgiStdin] = &conn;
-    cgiFdMap_[conn.cgiStdout] = &conn;
-
-    // Register CGI process for monitoring
-    CGIProcess proc(pid, conn);
+    CGIProcess proc(pid, DEFAULT, stdinPipe[1], stdoutPipe[0], conn);
     cgiProcesses_.push_back(proc);
     
-
-#ifdef __linux__
-    epoll_event ev;
-
-    ev.events = EPOLLOUT;
-    ev.data.fd = conn.cgiStdin;
-    epoll_ctl(epollFd_, EPOLL_CTL_ADD, conn.cgiStdin, &ev);
-
-    ev.events = EPOLLIN;
-    ev.data.fd = conn.cgiStdout;
-    epoll_ctl(epollFd_, EPOLL_CTL_ADD, conn.cgiStdout, &ev);
-
-#elif __APPLE__
-    struct kevent ev;
-
-    EV_SET(&ev, conn.cgiStdin, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
-    kevent(epollFd_, &ev, 1, NULL, 0, NULL);
-
-    EV_SET(&ev, conn.cgiStdout, EVFILT_READ, EV_ADD, 0, 0, NULL);
-    kevent(epollFd_, &ev, 1, NULL, 0, NULL);
-#endif
-
-    return 0;
+    addEvent(conn.cgiStdin, false, true);
+    addEvent(conn.cgiStdout, true, false);
 }
 
 std::string findCGI(const std::string& fileName, const StringMap& cgiMap) {
@@ -208,114 +170,32 @@ void Server::closeCgiFd(int& fd) {
 }
 
 void Server::handleCGIWrite(Connection& conn) {
-    // Streaming mode: pipe recvBuffer data to cgiStdin
-    if (conn.remainingBody > 0) {
-        size_t available = conn.recvBuffer.size();
-        if (available == 0)
-            return;
-
-        size_t toWrite = std::min(available, conn.remainingBody);
-        ssize_t n = write(conn.cgiStdin, conn.recvBuffer.data(), toWrite);
-
-        if (n > 0) {
-            conn.recvBuffer.consume(n);
-            conn.remainingBody -= n;
-            if (conn.remainingBody == 0) {
-                closeCgiFd(conn.cgiStdin);
-                conn.state = CGI_READING_OUTPUT;
-            }
-        } else if (n < 0 && errno == EPIPE) {
-            closeCgiFd(conn.cgiStdin);
-            conn.recvBuffer.clear();
-            conn.remainingBody = 0;
-            conn.state = CGI_READING_OUTPUT;
-        } else if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-            log(ERROR, "CGI stdin write failed");
-            closeCgiFd(conn.cgiStdin);
-            sendError(SERVER_ERROR, conn);
-        }
-        return;
-    }
-
-    // File-buffered or req.body mode: read from temp file or req.body
-    if (conn.cgiBodyTmpFd >= 0) {
-        // Read chunk from temp file, write to cgiStdin
-        char buf[65536];
-        ssize_t nRead = read(conn.cgiBodyTmpFd, buf, sizeof(buf));
-
-        if (nRead <= 0) {
-            // Done or error — close temp file and cgiStdin
-            close(conn.cgiBodyTmpFd);
-            unlink(conn.cgiBodyTmpPath.c_str());
-            conn.cgiBodyTmpFd = -1;
-            closeCgiFd(conn.cgiStdin);
-            conn.state = CGI_READING_OUTPUT;
-            return;
-        }
-
-        ssize_t nWrite = write(conn.cgiStdin, buf, nRead);
-        if (nWrite > 0) {
-            // If partial write, seek back the unwritten portion
-            if (nWrite < nRead)
-                lseek(conn.cgiBodyTmpFd, nWrite - nRead, SEEK_CUR);
-        } else if (nWrite < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-            // Pipe full, rewind what we read
-            lseek(conn.cgiBodyTmpFd, -nRead, SEEK_CUR);
-        } else if (nWrite < 0 && errno == EPIPE) {
-            close(conn.cgiBodyTmpFd);
-            unlink(conn.cgiBodyTmpPath.c_str());
-            conn.cgiBodyTmpFd = -1;
-            closeCgiFd(conn.cgiStdin);
-            conn.state = CGI_READING_OUTPUT;
-        } else if (nWrite < 0) {
-            log(ERROR, "CGI stdin write from file failed");
-            close(conn.cgiBodyTmpFd);
-            unlink(conn.cgiBodyTmpPath.c_str());
-            conn.cgiBodyTmpFd = -1;
-            closeCgiFd(conn.cgiStdin);
-            sendError(SERVER_ERROR, conn);
-        }
-        return;
-    }
-
-    // Small body buffered in req.body
     Request& req = conn.req;
+    CGI* cgi = conn.cgi;
 
-    if (conn.cgiWritePos >= req.body.size()) {
-        closeCgiFd(conn.cgiStdin);
-        return;
-    }
+    size_t remaining = req.bodySize - req.bodySent;
 
-    size_t remaining = req.body.size() - conn.cgiWritePos;
-    size_t chunk = remaining > 65536 ? 65536 : remaining;
+    if (remaining > BUFF_SIZE)
+        remaining = BUFF_SIZE;
 
-    ssize_t n = write(
-        conn.cgiStdin,
-        req.body.data() + conn.cgiWritePos,
-        chunk
-    );
-
+    ssize_t n = write(cgi->Stdin,
+                     req.body.c_str() + req.bodySent,
+                     remaining);
+    
     if (n > 0) {
-        conn.cgiWritePos += n;
+        req.bodySent += n;
 
-        if (conn.cgiWritePos >= req.body.size()) {
-            closeCgiFd(conn.cgiStdin);
-            conn.state = CGI_READING_OUTPUT;
-        }
-        return;
+        if (req.bodySent >= req.bodySize)
+            return closeCgiFd(cgi->cgiStdin);
     }
 
-    if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
-        return;
+    if (n == -1) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return;
 
-    if (n < 0 && errno == EPIPE) {
-        closeCgiFd(conn.cgiStdin);
-        return;
+        log(ERROR, "CGI write failed");
+            return closeCgiFd(cgi->cgiStdin);
     }
-
-    log(ERROR, "CGI stdin write failed");
-    closeCgiFd(conn.cgiStdin);
-    sendError(SERVER_ERROR, conn);
 }
 
 void Server::handleCGIRead(Connection& conn) {

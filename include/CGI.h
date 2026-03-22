@@ -6,6 +6,7 @@
 class CGI {
 	private:
 		std::string	path_;
+
 	public:
 		CGI(std::string path);
 		~CGI();

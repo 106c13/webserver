@@ -41,19 +41,15 @@ bool Server::handleMultipartUpload(Connection& conn, LocationConfig& location) {
     return true;
 }
 
-void Server::handleRequest(Connection& conn) {
+void Server::handleGet(Connection& conn) {
     Request& req = conn.req;
     Response& res = conn.res;
+    LocationConfig& location = conn.location;
 
-    LocationConfig location = resolveLocation(req.path);
     if (location.root.empty())
         return sendError(OK, conn);
 
-    resolvePath(req.path, location);
     res.path = req.path;
-
-    if (req.method == "DELETE")
-        return sendError(deleteResource(req.path), conn);
 
     std::string cgiPath = findCGI(req.path, location.cgi);
     if (!cgiPath.empty()) {
@@ -62,15 +58,6 @@ void Server::handleRequest(Connection& conn) {
         return;
     }
 
-    if (req.method == "POST") {
-        std::string contentType = req.headers["Content-Type"];
-        if (contentType.find("multipart/form-data") != std::string::npos) {
-            if (!handleMultipartUpload(conn, location))
-                return sendError(SERVER_ERROR, conn);
-        }
-    }
-
-    conn.res.status = OK;
     if (!prepareFileResponse(conn, req.path))
         return sendError(SERVER_ERROR, conn);
 

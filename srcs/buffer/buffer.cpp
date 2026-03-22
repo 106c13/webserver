@@ -96,3 +96,16 @@ void Buffer::clear() {
     start_ = 0;
     end_ = 0;
 }
+
+bool Buffer::findCRLF(size_t& pos) const {
+    const char* d = data_;
+    size_t len = end_ - start_;
+
+    for (size_t i = 0; i + 1 < len; ++i) {
+        if (d[start_ + i] == '\r' && d[start_ + i + 1] == '\n') {
+            pos = i;
+            return true;
+        }
+    }
+    return false;
+}

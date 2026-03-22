@@ -28,6 +28,7 @@ class Buffer {
 		void		append(const std::string& buf);
 		void		consume(size_t n);
 		void		clear();
+		bool		findCRLF(size_t& pos) const;
 };
 
 #endif

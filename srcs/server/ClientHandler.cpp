@@ -3,6 +3,7 @@
 #include "Buffer.h"
 
 void Server::handleRead(Connection& conn) {
+    conn.lastActivityTime = std::time(NULL);
     // When streaming body to CGI, cap the recv buffer to avoid
     // accumulating the entire request body in memory.
     size_t readSize;
@@ -24,6 +25,8 @@ void Server::handleRead(Connection& conn) {
 }
 
 void Server::handleWrite(Connection& conn) {
+    conn.lastActivityTime = std::time(NULL);
+
     ssize_t n = send(conn.fd,
                      conn.sendBuffer.data(),
                      conn.sendBuffer.size(),
@@ -49,4 +52,37 @@ void Server::handleWrite(Connection& conn) {
         modifyToRead(conn.fd);
     }
 
+}
+
+void Server::handleClient(Event& event) {
+    int fd;
+#ifdef __linux__
+    fd = event.data.fd;
+#elif __APPLE__
+    fd = (int)event.ident;
+#endif
+    Connection& conn = connections_[fd];
+
+#ifdef __linux__
+    if (event.events & EPOLLIN)
+        handleRead(conn);
+
+    if (event.events & EPOLLOUT)
+        handleWrite(conn);
+#elif __APPLE__
+    if (event.events & EVFILT_READ)
+        handleRead(conn);
+
+    if (event.events & EVFILT_WRITE)
+        handleWrite(conn);
+#endif
+
+    if (conn.state == CLOSED)
+        return closeConnection(conn.fd);
+
+    if (conn.state == READING_HEADER)
+        processHeaders(conn);
+
+    if (conn.state == READING_BODY)
+        proceccBody(conn);
 }

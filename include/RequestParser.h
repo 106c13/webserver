@@ -42,7 +42,11 @@ struct Request {
 	std::string							version;
 	std::map<std::string, std::string>	headers;
 	std::map<std::string, std::string>	queryParams;
+	std::string							header;
 	std::string							body;
+	size_t								bodySize;
+	size_t								bodySent;
+	BodySource							bodySource;
 	std::vector<Cookie>					cookies;
 	std::vector<SetCookie>				setCookies;
 	std::vector<MultipartPart>			multipartParts;

@@ -12,6 +12,8 @@ typedef std::map<std::string, std::string> StringMap;
 #define COLOR_RESET "\033[0m"
 
 #define MAX_HEADER_SIZE 8000
+#define MAX_MEMORY_BODY_SIZE 1000000
+#define MAX_CHUNK_SIZE_LEN 16
 #define HEADER_TIMEOUT 10
 #define BODY_TIMEOUT 5
 
