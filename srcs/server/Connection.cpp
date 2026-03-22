@@ -1,7 +1,19 @@
 #include <fcntl.h>
+#include <unistd.h>
 #include <ctime>
 #include "webserv.h"
 #include "ConfigParser.h"
+
+static void cleanupTempFile(Connection& conn) {
+    if (conn.req.fileBuffer >= 0) {
+        close(conn.req.fileBuffer);
+        conn.req.fileBuffer = -1;
+    }
+    if (!conn.req.tempFilePath.empty()) {
+        unlink(conn.req.tempFilePath.c_str());
+        conn.req.tempFilePath.clear();
+    }
+}
 
 void Server::checkTimeOuts() {
     for (std::map<int, Connection>::iterator it = connections_.begin(); 
@@ -71,6 +83,7 @@ void Server::closeConnection(int fd) {
     while (recv(fd, drain, sizeof(drain), 0) > 0)
         ;
     close(fd);
+    cleanupTempFile(connections_[fd]);
     connections_.erase(fd);
     std::cout << "Client disconnected..." << std::endl;
 }
