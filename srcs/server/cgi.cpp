@@ -212,6 +212,12 @@ void Server::cgiWriteFromMemory(Connection& conn) {
     Request& req = conn.req;
     CGI* cgi = conn.cgi;
 
+    if (req.body.empty() || req.bodySent >= req.body.size()) {
+        closeCgiFd(cgi->stdinFd);
+        conn.state = CGI_READING_OUTPUT;
+        return;
+    }
+
     size_t remaining = req.body.size() - req.bodySent;
     if (remaining > BUFFER_SIZE)
         remaining = BUFFER_SIZE;
@@ -245,14 +251,8 @@ void Server::cgiWriteFromFile(Connection& conn) {
 
     if (bytesRead > 0) {
         ssize_t n = write(cgi->stdinFd, buf, bytesRead);
-        if (n > 0) {
-            req.bodySent += n;
-            if (req.bodySent >= req.bodyReceived) {
-                closeCgiFd(cgi->stdinFd);
-                conn.state = CGI_READING_OUTPUT;
-            }
+        if (n > 0)
             return;
-        }
         if (n == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
             log(ERROR, "CGI file write failed");
             closeCgiFd(cgi->stdinFd);

@@ -1,8 +1,10 @@
 #include <iostream>
+#include <signal.h>
 #include "webserv.h"
 #include "ConfigParser.h"
 
 int main(int argc, char **argv) {
+	signal(SIGPIPE, SIG_IGN);
 	if (argc != 2) {
 		std::cerr << "Usage: " << argv[0] << " <config_file>" << std::endl;
 		return 1;

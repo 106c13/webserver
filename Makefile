@@ -3,6 +3,8 @@ NAME = webserv
 # ---------- Temprorary -----------
 CGI_SRC = cgi/test.c
 CGI_BIN = php-cgi
+ECHO_CGI_SRC = cgi/echo.c
+ECHO_CGI_BIN = cgi/echo
 CC = cc
 CFLAGS = -Wall -Wextra -Werror
 # ---------------------------------
@@ -40,13 +42,18 @@ RED = \033[1;31m
 CYAN = \033[1;36m
 RESET = \033[0m
 
-all: $(NAME) $(CGI_BIN)
+all: $(NAME) $(CGI_BIN) $(ECHO_CGI_BIN)
 
 # ---------- Temprorary -----------
 $(CGI_BIN): $(CGI_SRC)
 	@echo "$(CYAN)[Compiling CGI]$(RESET) $<"
 	@$(CC) $(CFLAGS) $< -o $(CGI_BIN)
 	@echo "$(GREEN)✅ CGI ready: ./$(CGI_BIN)$(RESET)"
+
+$(ECHO_CGI_BIN): $(ECHO_CGI_SRC)
+	@echo "$(CYAN)[Compiling CGI]$(RESET) $<"
+	@$(CC) $(CFLAGS) $< -o $(ECHO_CGI_BIN)
+	@echo "$(GREEN)✅ CGI ready: ./$(ECHO_CGI_BIN)$(RESET)"
 # ---------------------------------
 #
 $(NAME): $(OBJ)
@@ -68,18 +75,18 @@ $(OBJS_DIR)%.o: $(SRCS_DIR)%.cpp
 	@echo "$(CYAN)[Compiling]$(RESET) $<"
 	@$(CXX) $(CXXFLAGS) -c $< -o $@
 
-test:
+test: all
 	@$(CXX) $(CXXFLAGS) tests/test_config_parser.cpp $(SRCS_DIR)parser/ConfigParser.cpp -o test_config_parser
 	@$(CXX) $(CXXFLAGS) tests/test_request_parser.cpp $(SRCS_DIR)parser/RequestParser.cpp $(SRCS_DIR)server/header_generator.cpp -o test_request_parser
-	@./test_config_parser ; c=$$? ; echo "" ; ./test_request_parser ; r=$$? ; rm -f test_config_parser test_request_parser ; exit $$((c + r))
+	@./test_config_parser ; c=$$? ; echo "" ; ./test_request_parser ; r=$$? ; rm -f test_config_parser test_request_parser ; echo "" ; python3 tests/test_chunked.py ; ch=$$? ; exit $$((c + r + ch))
 
 clean:
 	@rm -rf $(OBJS_DIR)
 	@echo "$(RED)🧹 Object files removed!$(RESET)"
 
 fclean: clean
-	@rm -rf $(NAME) $(CGI_BIN)
-	@echo "$(RED)🔥 Executables removed: $(NAME), $(CGI_BIN)$(RESET)"
+	@rm -rf $(NAME) $(CGI_BIN) $(ECHO_CGI_BIN)
+	@echo "$(RED)🔥 Executables removed: $(NAME), $(CGI_BIN), $(ECHO_CGI_BIN)$(RESET)"
 
 re: fclean all
 

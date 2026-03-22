@@ -33,6 +33,8 @@ void Server::handleWrite(Connection& conn) {
         conn.sendBuffer.consume(n);
     } else if (n == 0) {
         return closeConnection(conn.fd);
+    } else {
+        return closeConnection(conn.fd);
     }
 
     if (conn.state == SENDING_RESPONSE) {
