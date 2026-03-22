@@ -206,6 +206,13 @@ static bool writeToFile(int fd, const char* data, size_t size) {
     return true;
 }
 
+static bool ensureTempFileOpen(Request& req) {
+    if (req.fileBuffer >= 0)
+        return true;
+    req.fileBuffer = openTempFile(req.tempFilePath);
+    return req.fileBuffer >= 0;
+}
+
 static bool appendToBody(Connection& conn, const char* data, size_t size) {
     Request& req = conn.req;
 
@@ -216,17 +223,17 @@ static bool appendToBody(Connection& conn, const char* data, size_t size) {
         }
 
         req.bodySource = BODY_FROM_FILE;
-        req.fileBuffer = openTempFile(req.tempFilePath);
-        if (req.fileBuffer < 0)
+        if (!ensureTempFileOpen(req))
             return false;
 
-        if (!writeToFile(req.fileBuffer,
-                    req.body.c_str(),
-                    req.body.size()))
+        if (!writeToFile(req.fileBuffer, req.body.c_str(), req.body.size()))
             return false;
 
         req.body.clear();
     }
+
+    if (!ensureTempFileOpen(req))
+        return false;
 
     return writeToFile(req.fileBuffer, data, size);
 }
@@ -349,6 +356,19 @@ void Server::finishBody(Connection& conn) {
     conn.state = PROCESSING;
 
     if (!req.boundary.empty()) {
+        if (req.bodySource == BODY_FROM_FILE) {
+            close(req.fileBuffer);
+            req.fileBuffer = open(req.tempFilePath.c_str(), O_RDONLY);
+            if (req.fileBuffer < 0)
+                return sendError(SERVER_ERROR, conn);
+            char buf[BUFFER_SIZE * 64];
+            ssize_t n;
+            req.body.clear();
+            while ((n = read(req.fileBuffer, buf, sizeof(buf))) > 0)
+                req.body.append(buf, n);
+            close(req.fileBuffer);
+            req.fileBuffer = -1;
+        }
         parseMultipart(req);
         if (!handleMultipartUpload(conn, loc))
             return sendError(SERVER_ERROR, conn);
