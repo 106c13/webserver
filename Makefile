@@ -15,7 +15,8 @@ SRC_MAIN   = main.cpp
 SRC_SERVER = server.cpp utils.cpp \
              defaults.cpp path_resolver.cpp \
 			 autoindex.cpp cgi.cpp header_generator.cpp Connection.cpp \
-			 ClientHandler.cpp RequestHandler.cpp ResponseBuilder.cpp
+			 ClientHandler.cpp RequestHandler.cpp ResponseBuilder.cpp \
+			 BodyHandler.cpp epoll.cpp
 SRC_PARSER = ConfigParser.cpp RequestParser.cpp
 SRC_BUFFER = buffer.cpp
 

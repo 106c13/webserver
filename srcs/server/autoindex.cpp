@@ -66,12 +66,12 @@ static std::string buildAutoindexPage(const std::string& path,
 
 // ── Server method ────────────────────────────────────────────────────────────
 
-void Server::generateAutoindex(Connection& conn, LocationConfig& location) {
+void Server::generateAutoindex(Connection& conn) {
     std::string path = conn.req.uri;
     if (path.empty() || path[path.size() - 1] != '/')
         path += '/';
 
-    std::vector<DirEntry> entries = listDirectory(location.root + path);
+    std::vector<DirEntry> entries = listDirectory(conn.location.root + path);
     std::string page = buildAutoindexPage(path, entries);
 
     Response& res      = conn.res;

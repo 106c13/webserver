@@ -4,19 +4,9 @@
 
 void Server::handleRead(Connection& conn) {
     conn.lastActivityTime = std::time(NULL);
-    // When streaming body to CGI, cap the recv buffer to avoid
-    // accumulating the entire request body in memory.
-    size_t readSize;
-    if (conn.state == CGI_WRITING_BODY || conn.state == CGI_BUFFERING_TO_FILE) {
-        if (conn.recvBuffer.size() > BUFFER_SIZE * 16)
-            return;
-        readSize = BUFFER_SIZE * 16;
-    } else {
-        readSize = BUFFER_SIZE * 1000;
-    }
 
     char buf[BUFFER_SIZE * 1000];
-    ssize_t n = recv(conn.fd, buf, readSize, 0);
+    ssize_t n = recv(conn.fd, buf, sizeof(buf), 0);
 
     if (n > 0)
         conn.recvBuffer.append(buf, n);
@@ -31,27 +21,20 @@ void Server::handleWrite(Connection& conn) {
                      conn.sendBuffer.data(),
                      conn.sendBuffer.size(),
                      0);
+
     if (n > 0) {
         conn.sendBuffer.consume(n);
     } else if (n == 0) {
         return closeConnection(conn.fd);
     }
 
-    if (conn.state == SENDING_RESPONSE) {
-        if (conn.sendBuffer.empty() && !conn.sendingFile) {
-            conn.state = CLOSED;
-            return;
-        }
-    }
-
-    if (conn.sendingFile) {
+    if (conn.state == SENDING_FILE) {
         streamFileChunk(conn);
     }
     
     if (conn.sendBuffer.empty()) {
         modifyToRead(conn.fd);
     }
-
 }
 
 void Server::handleClient(Event& event) {
@@ -84,5 +67,5 @@ void Server::handleClient(Event& event) {
         processHeaders(conn);
 
     if (conn.state == READING_BODY)
-        proceccBody(conn);
+        processBody(conn);
 }

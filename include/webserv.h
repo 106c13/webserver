@@ -39,16 +39,6 @@ typedef struct kevent Event;
 #define EVENT_DEL EV_DELETE
 #endif
 
-enum BodySource {
-    BODY_FROM_MEMORY,
-    BODY_FROM_FILE,
-    BODY_DONE
-};
-
-enum DataTransfer {
-    FIXED,
-    CHUNKED
-};
 
 enum ConnState {
     READING_HEADER = 50,
@@ -63,19 +53,13 @@ enum ConnState {
     SENDING_RESPONSE = 44,
     TIMEOUT = 43,
     CLOSED = 42,
-    CGI_READING_OUTPUT = 41,
-    CGI_WRITING_BODY = 40,
-    CGI_BUFFERING_TO_FILE = 39
 };
 
-enum FileBufferState {
-	NOT_USED = 70;
-	USED = 71;
-}
+struct CGIProcess;
 
 struct Connection {
     int         	fd;
-	int				state;
+	ConnState		state;
 
     Buffer			recvBuffer;
     Buffer			sendBuffer;
@@ -87,23 +71,25 @@ struct Connection {
 
 	time_t			lastActivityTime;
 
-	CGI*			cgi;
+	CGIProcess*		cgi;
 
 	size_t chunkSize;
 	bool   hasChunkSize;
 };
 
-struct CGI {
+struct CGIProcess {
     pid_t		pid;
 	int			state;
 	int			Stdin;
 	int			Stdout;
+	Connection*	conn;
+	std::string	rawOutput;
 
     CGIProcess(pid_t p, int s, int in, int out, Connection& c) :
 		pid(p),
 		state(s),
-		cgiStdin(in),
-		cgiStdout(out),
+		Stdin(in),
+		Stdout(out),
 		conn(&c) {}
 };
 
@@ -138,13 +124,13 @@ class	Server {
 		void			modifyToWrite(int fd);
 		void			modifyToRead(int fd);
 		void			closeConnection(int fd);
-		int				runCGI(const char* cgiPath, Connection& conn);
+		void			runCGI(const char* cgiPath, Connection& conn);
 		void			sendCGIOutput(Connection& conn, int cgiFd);
 		void			handleRequest(Connection& conn);
 		int				resolvePath(std::string& path, LocationConfig& location);
 		LocationConfig&	resolveLocation(std::string& fs_path);
-		void			generateAutoindex(Connection& conn, LocationConfig& location);
-		void			sendRedirect(Connection& conn, const LocationConfig& location);
+		void			generateAutoindex(Connection& conn);
+		void			sendRedirect(Connection& conn);
 		bool			prepareFileResponse(Connection& conn, const std::string& path);
 		bool			streamFileChunk(Connection& conn);
 		void			sendError(int code, Connection& conn);
@@ -163,6 +149,10 @@ class	Server {
 		void			closeCgiFd(int& fd);
 		void			checkCGIProcesses();
 		void			startQueuedCGIs();
+		void			handleGet(Connection& conn);
+		void			startBodyReading(Connection& conn);
+		void			addEvent(int fd, bool wantRead, bool wantWrite);
+		void			processFixedBody(Connection& conn);
 
 	public:
 		Server(const ServerConfig& config); // Start server with configurations from file
@@ -180,4 +170,5 @@ std::string				readFile(const std::string& filename);
 std::vector<DirEntry>	listDirectory(const std::string& path);
 std::string				toString(size_t n);
 std::string				findCGI(const std::string& fileName, const StringMap& cgiMap);
+int						openTempFile();
 #endif

@@ -3,16 +3,6 @@
 #include "webserv.h"
 #include "ConfigParser.h"
 
-int deleteResource(const std::string& path) {
-    if (access(path.c_str(), W_OK) != 0)
-        return FORBIDDEN;
-
-    if (remove(path.c_str()) != 0)
-        return SERVER_ERROR;
-
-    return NO_CONTENT;
-}
-
 bool Server::handleMultipartUpload(Connection& conn, LocationConfig& location) {
     for (std::vector<MultipartPart>::iterator it = conn.req.multipartParts.begin();
          it != conn.req.multipartParts.end();

@@ -1,23 +1,9 @@
+#include <unistd.h>
+#include <cstdlib>
+#include <cstring>
 #include "ConfigParser.h"
 #include "defines.h"
 #include "webserv.h"
-
-static bool requestComplete(const Buffer& buf, size_t& endPos) {
-    const char* data = buf.data();
-    size_t len = buf.size();
-
-    for (size_t i = 0; i + 3 < len; ++i) {
-        if (data[i] == '\r' &&
-            data[i+1] == '\n' &&
-            data[i+2] == '\r' &&
-            data[i+3] == '\n')
-        {
-            endPos = i + 4;
-            return true;
-        }
-    }
-    return false;
-}
 
 static bool chunkedBodyComplete(const Buffer& buf, size_t& endPos) {
     const char* data = buf.data();
@@ -41,29 +27,6 @@ static bool chunkedBodyComplete(const Buffer& buf, size_t& endPos) {
     return false;
 }
 
-static int checkMethod(const Request& req, const LocationConfig& location) {
-    const std::string& method = req.method;
-
-    if (location.methods.empty()) {
-        if (method == "GET" ||
-            method == "POST" ||
-            method == "DELETE")
-            return OK;
-
-        return BAD_REQUEST;
-    }
-
-    for (std::vector<std::string>::const_iterator it = location.methods.begin();
-         it != location.methods.end();
-         ++it)
-    {
-        if (*it == method)
-            return OK;
-    }
-
-    return METHOD_NOT_ALLOWED;
-}
-
 static bool parseContentLength(Request& req) {
     StringMap::iterator it = req.headers.find("Content-Length");
     if (it == req.headers.end())
@@ -79,7 +42,7 @@ static bool parseContentLength(Request& req) {
         return false;
 
     req.bodySize = static_cast<size_t>(len);
-    req.bodySent = 0;
+    req.bodyReceived = 0;
     return true;
 }
 
@@ -106,61 +69,55 @@ static bool writeToFile(int fd, const char* data, size_t size) {
 static bool appendToBody(Connection& conn, const char* data, size_t size) {
     Request& req = conn.req;
 
+    req.bodyReceived += size;
     if (req.bodySource == BODY_FROM_MEMORY) {
         if (req.body.size() + size <= MAX_MEMORY_BODY_SIZE) {
             req.body.append(data, size);
-            return;
+            return true;
         }
 
         req.bodySource = BODY_FROM_FILE;
         req.fileBuffer = openTempFile();
 
         if (!writeToFile(req.fileBuffer,
-                    req.body.c_str(),
-                    req.body.size()))
+                         req.body.c_str(),
+                         req.body.size()))
             return false;
 
         req.body.clear();
     }
 
-    return writeToFile(req.fileBuffer, data, size);
+    if (!writeToFile(req.fileBuffer, data, size))
+        return false;
+
+    return true;
 }
 
 void Server::startBodyReading(Connection& conn) {
     Request& req = conn.req;
     LocationConfig& loc = conn.location;
 
-    bool chunked = isChunked(req);
-    bool hasCL = (req.headers.find("Content-Length") != req.headers.end());
-
-    if (chunked && hasCL)
-        return sendError(BAD_REQUEST, conn);
-
-    if (chunked) {
+    if (isChunked(req)) {
         conn.state = READING_CHUNK_SIZE;
         conn.req.transferType = CHUNKED;
         return;
     }
 
-    conn.req.transferType = FIXED;
-    if (parseContentLength(req)) {
+    if (!parseContentLength(req))
+        return sendError(BAD_REQUEST, conn);
 
-        if (loc.hasClientMaxBodySize && req.bodySize > loc.clientMaxBodySize)
-            return sendError(PAYLOAD_TOO_LARGE, conn);
+    if (loc.hasClientMaxBodySize && req.bodySize > loc.clientMaxBodySize)
+        return sendError(PAYLOAD_TOO_LARGE, conn);
 
-        if (req.bodySize > MAX_MEMORY_BODY)
-            conn.req.bodySource = BODT_FROM_FILE;
-        else
-            conn.req.bodySource = BODY_FROM_MEMORY;
-        conn.state = READING_BODY;
-
-        std::string cgiPath = findCGI(req.path, loc.cgi);
-        if (!cgiPath.empty())
-            return runCGI(cgiPath, conn);
-        return;
+    if (req.bodySize > MAX_MEMORY_BODY_SIZE) {
+        req.bodySource = BODY_FROM_FILE;
+        req.fileBuffer = openTempFile();
+    } else {
+        req.bodySource = BODY_FROM_MEMORY;
     }
 
-    return sendError(BAD_REQUEST, conn);
+    conn.req.transferType = FIXED;
+    conn.state = READING_BODY;
 }
 
 void Server::processFixedBody(Connection& conn) {
@@ -177,57 +134,18 @@ void Server::processFixedBody(Connection& conn) {
     conn.recvBuffer.consume(toRead);
 
     if (req.body.size() == req.bodySize) {
-        // DONE BODY READING
+        req.bodySent = 0;
+        std::string cgiPath = findCGI(req.path, conn.location.cgi);
+        if (!cgiPath.empty())
+            return runCGI(cgiPath.c_str(), conn);
     }
+
+    // Handle request
 }
 
 void Server::processChunkedBody(Connection& conn) {
-    Request& req = conn.req;
-
-    while (true) {
-        if (!req.hasChunkSize) {
-            size_t pos;
-
-            if (!conn.recvBuffer.findCRLF(pos)) {
-                if (conn.recvBuffer.size() > MAX_CHUNK_SIZE_LEN)
-                    return sendError(BAD_REQUEST, conn);
-                return;
-            }
-
-            if (pos > MAX_CHUNK_SIZE_LEN)
-                return sendError(BAD_REQUEST, conn);
-
-            std::string line(conn.recvBuffer.data(), pos);
-
-            req.chunkSize = std::strtoul(line.c_str(), NULL, 16);
-
-            conn.recvBuffer.consume(pos + 2);
-            req.hasChunkSize = true;
-
-            if (req.chunkSize == 0) {
-                return;
-            }
-        }
-
-        if (conn.recvBuffer.size() < req.chunkSize + 2)
-            return;
-
-        if (!appendToBody(conn,
-                          conn.recvBuffer.data(),
-                          req.chunkSize))
-        {
-            return sendError(SERVER_ERROR, conn);
-        }
-
-        const char* tail = conn.recvBuffer.data() + req.chunkSize;
-
-        if (tail[0] != '\r' || tail[1] != '\n')
-            return sendError(BAD_REQUEST, conn);
-
-        conn.recvBuffer.consume(req.chunkSize + 2);
-
-        req.hasChunkSize = false;
-    }
+    conn.req.body.append("Data");
+    conn.req.bodySize += 4;
 }
 
 void Server::processBody(Connection& conn) {
@@ -235,4 +153,15 @@ void Server::processBody(Connection& conn) {
         processFixedBody(conn);
     else
         processChunkedBody(conn);
+}
+
+int openTempFile() {
+    char tmpl[] = "/tmp/webserver_XXXXXX";
+
+    int fd = mkstemp(tmpl);
+    if (fd == -1)
+        return -1;
+
+    unlink(tmpl);
+    return fd;
 }

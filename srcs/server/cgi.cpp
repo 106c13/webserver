@@ -33,11 +33,8 @@ char** Server::createEnvironment(const Request& req) {
     env[i++] = strdup(serverPort.c_str());
 
     if (req.method == "POST") {
-        std::map<std::string,std::string>::const_iterator itCL = req.headers.find("Content-Length");
-        if (itCL != req.headers.end()) {
-            std::string contentLength = "CONTENT_LENGTH=" + itCL->second;
-            env[i++] = strdup(contentLength.c_str());
-        }
+        std::string contentLength = "CONTENT_LENGTH=" + req.bodySize;
+        env[i++] = strdup(contentLength.c_str());
 
         std::map<std::string,std::string>::const_iterator itType = req.headers.find("Content-Type");
         if (itType != req.headers.end()) {
@@ -70,7 +67,6 @@ char** Server::createEnvironment(const Request& req) {
         envVar += "=" + it->second;
 
         env[i++] = strdup(envVar.c_str());
-        std::cout << env[i - 1] << std::endl;
     }
 
     env[i] = NULL;
@@ -81,16 +77,13 @@ void Server::runCGI(const char* cgiPath, Connection& conn) {
     int stdinPipe[2];
     int stdoutPipe[2];
 
-    if (pipe(stdinPipe) < 0 || pipe(stdoutPipe) < 0) {
-        log(ERROR, "PIPE ERROR");
-        return -1;
-    }
+    if (pipe(stdinPipe) < 0 || pipe(stdoutPipe) < 0)
+        return log(ERROR, "PIPE ERROR");
 
     pid_t pid = fork();
-    if (pid < 0) {
-        log(ERROR, "FORK ERROR");
-        return -1;
-    }
+
+    if (pid < 0)
+        return log(ERROR, "FORK ERROR");
 
     if (pid == 0) {
         dup2(stdinPipe[0], STDIN_FILENO);
@@ -122,11 +115,12 @@ void Server::runCGI(const char* cgiPath, Connection& conn) {
     cgiFdMap_[stdinPipe[1]] = &conn;
     cgiFdMap_[stdoutPipe[0]] = &conn;
 
-    CGIProcess proc(pid, DEFAULT, stdinPipe[1], stdoutPipe[0], conn);
+    CGIProcess proc(pid, 0, stdinPipe[1], stdoutPipe[0], conn);
     cgiProcesses_.push_back(proc);
     
-    addEvent(conn.cgiStdin, false, true);
-    addEvent(conn.cgiStdout, true, false);
+    addEvent(proc.Stdin, false, true);
+    addEvent(proc.Stdout, true, false);
+    conn.cgi = &proc;
 }
 
 std::string findCGI(const std::string& fileName, const StringMap& cgiMap) {
@@ -171,12 +165,12 @@ void Server::closeCgiFd(int& fd) {
 
 void Server::handleCGIWrite(Connection& conn) {
     Request& req = conn.req;
-    CGI* cgi = conn.cgi;
+    CGIProcess* cgi = conn.cgi;
 
     size_t remaining = req.bodySize - req.bodySent;
 
-    if (remaining > BUFF_SIZE)
-        remaining = BUFF_SIZE;
+    if (remaining > BUFFER_SIZE)
+        remaining = BUFFER_SIZE;
 
     ssize_t n = write(cgi->Stdin,
                      req.body.c_str() + req.bodySent,
@@ -186,7 +180,7 @@ void Server::handleCGIWrite(Connection& conn) {
         req.bodySent += n;
 
         if (req.bodySent >= req.bodySize)
-            return closeCgiFd(cgi->cgiStdin);
+            return closeCgiFd(cgi->Stdin);
     }
 
     if (n == -1) {
@@ -194,88 +188,67 @@ void Server::handleCGIWrite(Connection& conn) {
             return;
 
         log(ERROR, "CGI write failed");
-            return closeCgiFd(cgi->cgiStdin);
+            return closeCgiFd(cgi->Stdin);
     }
+}
+
+static void parseCGIHeaders(Response& res, const std::string& headers) {
+    res.status = OK;
+    res.contentType = "text/html";
+
+    std::istringstream stream(headers);
+    std::string line;
+
+    while (std::getline(stream, line)) {
+        if (!line.empty() && line[line.size() - 1] == '\r')
+            line.resize(line.size() - 1);
+
+        if (line.find("Status:") == 0)
+            res.status = atoi(line.substr(7).c_str());
+        else if (line.find("Content-Type:") == 0)
+            res.contentType = line.substr(13);
+        else if (line.find("Location:") == 0)
+            res.location = line.substr(10);
+    }
+}
+
+static void buildResponseFromCGI(Connection& conn) {
+    std::string& raw = conn.cgi->rawOutput;
+
+    size_t pos = raw.find("\r\n\r\n");
+
+    std::string headers;
+    if (pos != std::string::npos) {
+        headers = raw.substr(0, pos);
+        raw.erase(0, pos + 4);
+    }
+
+    Response& res = conn.res;
+    res.status = OK;
+    res.contentType = "text/html";
+
+    parseCGIHeaders(res, headers);
+
+    res.contentLength = toString(raw.size());
 }
 
 void Server::handleCGIRead(Connection& conn) {
     char buf[BUFFER_SIZE];
+    ssize_t n = read(conn.cgi->Stdout, buf, BUFFER_SIZE);
 
-    while (true) {
-        ssize_t n = read(conn.cgiStdout, buf, BUFFER_SIZE);
-        //std::cout << n << std::endl;
-        if (n > 0) {
-            // Append everything to temporary CGI output buffer
-            conn.cgiRawOutput.append(buf, n);
-
-            return;
-        }
-
-        if (n == 0) {
-            //std::cout << "In n = 0\n";
-            // EOF → CGI finished
-            closeCgiFd(conn.cgiStdout);
-
-            int status;
-            waitpid(conn.cgiPid, &status, WNOHANG);
-
-            // Now parse CGI headers and prepare sendBuffer
-            size_t headerEnd = conn.cgiRawOutput.find("\r\n\r\n");
-            std::string cgiHeaders;
-            std::string body;
-
-            if (headerEnd != std::string::npos) {
-                cgiHeaders = conn.cgiRawOutput.substr(0, headerEnd);
-                body = conn.cgiRawOutput.substr(headerEnd + 4);
-            } else {
-                body = conn.cgiRawOutput; // no headers
-            }
-
-            Response& res = conn.res;
-            res.status = OK;           // default
-            res.contentType = "text/html";
-
-            std::istringstream stream(cgiHeaders);
-            std::string line;
-            while (std::getline(stream, line)) {
-                if (!line.empty() && line[line.size()-1] == '\r')
-                    line.resize(line.size()-1); // old-style pop_back
-
-                if (line.find("Status:") == 0)
-                    res.status = atoi(line.substr(7).c_str());
-                else if (line.find("Content-Type:") == 0)
-                    res.contentType = line.substr(13);
-                else if (line.find("Location:") == 0)
-                    res.location = line.substr(10);
-            }
-
-            // Set Content-Length now, because we have full body
-            res.contentLength = toString(body.size());
-
-            // Generate HTTP header
-            std::string header = generateHeader(res);
-            std::cout << header;
-            // Fill sendBuffer with header + body
-            conn.sendBuffer.append(header);
-            conn.sendBuffer.append(body);
-
-            // Switch to sending response
-            conn.state = SENDING_RESPONSE;
-            modifyToWrite(conn.fd);
-
-            conn.cgiRawOutput.clear();
-            return;
-        }
-
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            // No more data ready for now, return and wait for epoll
-            return;
-        }
-
-        // Any other read error
-        log(ERROR, "CGI stdout read failed");
-        closeCgiFd(conn.cgiStdout);
-        sendError(SERVER_ERROR, conn);
+    if (n > 0) {
+        conn.cgi->rawOutput.append(buf, n);
         return;
+    } else if (n == 0) {
+        closeCgiFd(conn.cgi->Stdout);
+        buildResponseFromCGI(conn);
+
+        std::string header = generateHeader(conn.res);
+        conn.sendBuffer.append(header);
+        conn.sendBuffer.append(conn.cgi->rawOutput);
+        conn.cgi->rawOutput.clear();
+        modifyToWrite(conn.fd);
+    } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
+        return sendError(SERVER_ERROR, conn);
     }
 }

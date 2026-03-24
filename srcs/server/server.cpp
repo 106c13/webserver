@@ -8,8 +8,59 @@
 #include <cerrno>
 #include <cstring>
 #include <sstream>
+#include <cstdio>
 #include "webserv.h"
 #include "ConfigParser.h"
+
+static bool requestComplete(const Buffer& buf, size_t& endPos) {
+    const char* data = buf.data();
+    size_t len = buf.size();
+
+    for (size_t i = 0; i + 3 < len; ++i) {
+        if (data[i] == '\r' &&
+            data[i+1] == '\n' &&
+            data[i+2] == '\r' &&
+            data[i+3] == '\n')
+        {
+            endPos = i + 4;
+            return true;
+        }
+    }
+    return false;
+}
+
+static int checkMethod(const Request& req, const LocationConfig& location) {
+    const std::string& method = req.method;
+
+    if (location.methods.empty()) {
+        if (method == "GET" ||
+            method == "POST" ||
+            method == "DELETE")
+            return OK;
+
+        return BAD_REQUEST;
+    }
+
+    for (std::vector<std::string>::const_iterator it = location.methods.begin();
+         it != location.methods.end();
+         ++it)
+    {
+        if (*it == method)
+            return OK;
+    }
+
+    return METHOD_NOT_ALLOWED;
+}
+
+static int deleteResource(const std::string& path) {
+    if (access(path.c_str(), W_OK) != 0)
+        return FORBIDDEN;
+
+    if (remove(path.c_str()) != 0)
+        return SERVER_ERROR;
+
+    return NO_CONTENT;
+}
 
 void Server::processHeaders(Connection& conn) {
     size_t endPos;
@@ -23,7 +74,7 @@ void Server::processHeaders(Connection& conn) {
     if (endPos > MAX_HEADER_SIZE)
         return sendError(BAD_REQUEST, conn);
 
-    conn.req.header.assign(conn.recvBuffer.data(), endPos);
+    conn.req.header.assign(conn.recvBuffer.data(), endPos); //TODO maybe remove this?
     conn.recvBuffer.consume(endPos);
 
     std::cout << conn.req.header;
@@ -36,36 +87,32 @@ void Server::processHeaders(Connection& conn) {
 
     int status;
     
-    status = checkMethod(conn.req, con.location);
+    status = checkMethod(conn.req, conn.location);
     if (status != OK)
         return sendError(status, conn);
 
-    status = resolvePath(conn.req.path, con.location);
+    status = resolvePath(conn.req.path, conn.location);
     if (status == DIRECTORY_NO_INDEX && conn.location.autoindex)
         return generateAutoindex(conn);
 
     if (status != OK)
         return sendError(status, conn);
     
-    if (location.redirectCode != 0)
+    if (conn.location.redirectCode != 0)
         return sendRedirect(conn);
 
     if (conn.req.method == "GET")
         return handleGet(conn);
 
     if (conn.req.method == "DELETE")
-        return sendError(deleteResource(req.path), conn);
+        return sendError(deleteResource(conn.req.path), conn);
 
     return startBodyReading(conn);
 }
 
-
-//====================================================
-
 static void setupConnection(Connection& conn, int fd) {
 	conn.fd = fd;
-    conn.sendingFile = false;
-    conn.state = READING_HEADERS;
+    conn.state = READING_HEADER;
     conn.lastActivityTime = std::time(NULL);
 }
 
@@ -169,7 +216,6 @@ void Server::loop() {
 
         checkTimeOuts();
         checkCGIProcesses();
-        startQueuedCGIs();
         if (evCount < 0)
             continue;
 
