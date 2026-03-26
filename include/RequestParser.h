@@ -56,10 +56,10 @@ struct Request {
 	std::string							header;
 	std::string							body;
 	int									fileBuffer;
+	std::string							tempFilePath;
 	size_t								bodySize;
 	size_t								bodyReceived;
 	size_t								bodySent;
-	BodySource							bodySource;
 	DataTransfer						transferType;
 	std::vector<Cookie>					cookies;
 	std::vector<SetCookie>				setCookies;

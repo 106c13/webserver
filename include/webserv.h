@@ -41,7 +41,7 @@ typedef struct kevent Event;
 
 
 enum ConnState {
-    READING_HEADER = 50,
+    READING_HEADER = 52,
     READING_BODY = 51,
 	SENDING_FILE = 50,
 
@@ -71,26 +71,17 @@ struct Connection {
 
 	time_t			lastActivityTime;
 
-	CGIProcess*		cgi;
-
 	size_t chunkSize;
 	bool   hasChunkSize;
 };
 
 struct CGIProcess {
-    pid_t		pid;
-	int			state;
-	int			Stdin;
-	int			Stdout;
-	Connection*	conn;
-	std::string	rawOutput;
+    pid_t pid;
+    std::string tmpFilePath;
+    Connection* conn;
 
-    CGIProcess(pid_t p, int s, int in, int out, Connection& c) :
-		pid(p),
-		state(s),
-		Stdin(in),
-		Stdout(out),
-		conn(&c) {}
+    CGIProcess(pid_t p, const std::string& path, Connection* c)
+        : pid(p), tmpFilePath(path), conn(c) {}
 };
 
 
@@ -109,7 +100,6 @@ class	Server {
 
 		// variables
 		std::map<int, Connection>	connections_;
-		std::map<int, Connection*>	cgiFdMap_;
 		std::vector<CGIProcess>		cgiProcesses_;
 		std::vector<int>			cgiQueue_;
 		int							serverFd_;
@@ -144,12 +134,13 @@ class	Server {
 		void			processHeaders(Connection& conn);
 		void			checkTimeOuts();
 
-		void			handleCGIRead(Connection& conn);
+		void			handleCGIRead(Connection& conn, const std::string& tmpFilePath);
 		void			handleCGIWrite(Connection& conn);
 		void			closeCgiFd(int& fd);
 		void			checkCGIProcesses();
 		void			startQueuedCGIs();
 		void			handleGet(Connection& conn);
+		void			handlePost(Connection& conn);
 		void			startBodyReading(Connection& conn);
 		void			addEvent(int fd, bool wantRead, bool wantWrite);
 		void			processFixedBody(Connection& conn);
@@ -170,5 +161,5 @@ std::string				readFile(const std::string& filename);
 std::vector<DirEntry>	listDirectory(const std::string& path);
 std::string				toString(size_t n);
 std::string				findCGI(const std::string& fileName, const StringMap& cgiMap);
-int						openTempFile();
+int						openTempFile(std::string& path);
 #endif

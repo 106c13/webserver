@@ -31,6 +31,26 @@ bool Server::handleMultipartUpload(Connection& conn, LocationConfig& location) {
     return true;
 }
 
+
+void Server::handlePost(Connection& conn) {
+    Request& req = conn.req;
+    Response& res = conn.res;
+    LocationConfig& location = conn.location;
+
+    res.path = req.path;
+    conn.state = PROCESSING;
+    std::cout << "In handlePost\n";
+    std::string cgiPath = findCGI(req.path, location.cgi);
+    if (!cgiPath.empty())
+        return runCGI(cgiPath.c_str(), conn);
+
+    if (!prepareFileResponse(conn, req.path))
+        return sendError(SERVER_ERROR, conn);
+
+    streamFileChunk(conn);
+    modifyToWrite(conn.fd);
+}
+
 void Server::handleGet(Connection& conn) {
     Request& req = conn.req;
     Response& res = conn.res;
@@ -42,11 +62,8 @@ void Server::handleGet(Connection& conn) {
     res.path = req.path;
 
     std::string cgiPath = findCGI(req.path, location.cgi);
-    if (!cgiPath.empty()) {
-        std::cout << "Running cgi\n";
-        runCGI(cgiPath.c_str(), conn);
-        return;
-    }
+    if (!cgiPath.empty())
+        return runCGI(cgiPath.c_str(), conn);
 
     if (!prepareFileResponse(conn, req.path))
         return sendError(SERVER_ERROR, conn);

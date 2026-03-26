@@ -4,6 +4,7 @@
 #include <fcntl.h> 
 #include <errno.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include "defines.h"
 #include "webserv.h"
 
@@ -33,7 +34,7 @@ char** Server::createEnvironment(const Request& req) {
     env[i++] = strdup(serverPort.c_str());
 
     if (req.method == "POST") {
-        std::string contentLength = "CONTENT_LENGTH=" + req.bodySize;
+        std::string contentLength = "CONTENT_LENGTH=" + toString(req.bodySize);
         env[i++] = strdup(contentLength.c_str());
 
         std::map<std::string,std::string>::const_iterator itType = req.headers.find("Content-Type");
@@ -70,57 +71,50 @@ char** Server::createEnvironment(const Request& req) {
     }
 
     env[i] = NULL;
+    //for (int j = 0; j < i; j++) {
+    //    std::cout << env[j] << std::endl;
+    //}
     return env;
 }
 
 void Server::runCGI(const char* cgiPath, Connection& conn) {
-    int stdinPipe[2];
-    int stdoutPipe[2];
-
-    if (pipe(stdinPipe) < 0 || pipe(stdoutPipe) < 0)
-        return log(ERROR, "PIPE ERROR");
+    char tmpl[] = "/tmp/webserver_cgiXXXXXX";
+    int tmpFd = mkstemp(tmpl);
+    if (tmpFd == -1)
+        return log(ERROR, "Failed to create tmp file");
+    close(tmpFd);
 
     pid_t pid = fork();
-
     if (pid < 0)
-        return log(ERROR, "FORK ERROR");
+        return log(ERROR, "Fork failed");
 
     if (pid == 0) {
-        dup2(stdinPipe[0], STDIN_FILENO);
-        dup2(stdoutPipe[1], STDOUT_FILENO);
-        dup2(stdoutPipe[1], STDERR_FILENO);
+        int outFd = open(tmpl, O_WRONLY | O_TRUNC);
+        if (outFd == -1)
+            _exit(1);
 
-        close(stdinPipe[0]);
-        close(stdinPipe[1]);
-        close(stdoutPipe[0]);
-        close(stdoutPipe[1]);
+        dup2(outFd, STDOUT_FILENO);
+        dup2(outFd, STDERR_FILENO);
+        close(outFd);
 
+        if (conn.req.method == "POST") {
+            int fd = open(conn.req.tempFilePath.c_str(), O_RDONLY);
+            if (fd == -1)
+                _exit(1);
+
+            dup2(fd, STDIN_FILENO);
+            close(fd);
+        }
+
+        char* argv[] = { const_cast<char*>(cgiPath),
+                         const_cast<char*>(conn.req.path.c_str()),
+                         NULL};
         char** env = createEnvironment(conn.req);
-        char* argv[] = {
-            const_cast<char*>(cgiPath),
-            const_cast<char*>(conn.req.path.c_str()),
-            NULL
-        };
-
         execve(cgiPath, argv, env);
         _exit(1);
     }
 
-    close(stdinPipe[0]);
-    close(stdoutPipe[1]);
-
-    fcntl(stdinPipe[1], F_SETFL, O_NONBLOCK);
-    fcntl(stdoutPipe[0], F_SETFL, O_NONBLOCK);
-
-    cgiFdMap_[stdinPipe[1]] = &conn;
-    cgiFdMap_[stdoutPipe[0]] = &conn;
-
-    CGIProcess proc(pid, 0, stdinPipe[1], stdoutPipe[0], conn);
-    cgiProcesses_.push_back(proc);
-    
-    addEvent(proc.Stdin, false, true);
-    addEvent(proc.Stdout, true, false);
-    conn.cgi = &proc;
+    cgiProcesses_.push_back(CGIProcess(pid, tmpl, &conn));
 }
 
 std::string findCGI(const std::string& fileName, const StringMap& cgiMap) {
@@ -145,53 +139,6 @@ std::string findCGI(const std::string& fileName, const StringMap& cgiMap) {
 	return it->second;
 }
 
-void Server::closeCgiFd(int& fd) {
-    if (fd == -1)
-        return;
-#ifdef __linux__
-    epoll_ctl(epollFd_, EPOLL_CTL_DEL, fd, NULL);
-#elif __APPLE__
-    struct kevent ev;
-    EV_SET(&ev, fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
-    kevent(epollFd_, &ev, 1, NULL, 0, NULL);
-    EV_SET(&ev, fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
-    kevent(epollFd_, &ev, 1, NULL, 0, NULL);
-#endif
-
-    close(fd);
-    cgiFdMap_.erase(fd);
-    fd = -1;
-}
-
-void Server::handleCGIWrite(Connection& conn) {
-    Request& req = conn.req;
-    CGIProcess* cgi = conn.cgi;
-
-    size_t remaining = req.bodySize - req.bodySent;
-
-    if (remaining > BUFFER_SIZE)
-        remaining = BUFFER_SIZE;
-
-    ssize_t n = write(cgi->Stdin,
-                     req.body.c_str() + req.bodySent,
-                     remaining);
-    
-    if (n > 0) {
-        req.bodySent += n;
-
-        if (req.bodySent >= req.bodySize)
-            return closeCgiFd(cgi->Stdin);
-    }
-
-    if (n == -1) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK)
-            return;
-
-        log(ERROR, "CGI write failed");
-            return closeCgiFd(cgi->Stdin);
-    }
-}
-
 static void parseCGIHeaders(Response& res, const std::string& headers) {
     res.status = OK;
     res.contentType = "text/html";
@@ -212,43 +159,62 @@ static void parseCGIHeaders(Response& res, const std::string& headers) {
     }
 }
 
-static void buildResponseFromCGI(Connection& conn) {
-    std::string& raw = conn.cgi->rawOutput;
-
-    size_t pos = raw.find("\r\n\r\n");
-
+void Server::handleCGIRead(Connection& conn, const std::string& tmpFilePath) {
+    std::string raw;
     std::string headers;
-    if (pos != std::string::npos) {
-        headers = raw.substr(0, pos);
-        raw.erase(0, pos + 4);
-    }
-
-    Response& res = conn.res;
-    res.status = OK;
-    res.contentType = "text/html";
-
-    parseCGIHeaders(res, headers);
-
-    res.contentLength = toString(raw.size());
-}
-
-void Server::handleCGIRead(Connection& conn) {
     char buf[BUFFER_SIZE];
-    ssize_t n = read(conn.cgi->Stdout, buf, BUFFER_SIZE);
 
-    if (n > 0) {
-        conn.cgi->rawOutput.append(buf, n);
-        return;
-    } else if (n == 0) {
-        closeCgiFd(conn.cgi->Stdout);
-        buildResponseFromCGI(conn);
-
-        std::string header = generateHeader(conn.res);
-        conn.sendBuffer.append(header);
-        conn.sendBuffer.append(conn.cgi->rawOutput);
-        conn.cgi->rawOutput.clear();
-        modifyToWrite(conn.fd);
-    } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
+    int fd = open(tmpFilePath.c_str(), O_RDONLY);
+    if (fd < 0) {
+        log(ERROR, "Can't open file");
         return sendError(SERVER_ERROR, conn);
     }
+
+    ssize_t totalSize = getFileSize(tmpFilePath);
+    if (totalSize < 0) {
+        log(ERROR, "Can't get file size");
+        close(fd);
+        return sendError(SERVER_ERROR, conn);
+    }
+
+    size_t pos = std::string::npos;
+
+    while (true) {
+        ssize_t n = read(fd, buf, BUFFER_SIZE);
+        if (n > 0) {
+            raw.append(buf, n);
+
+            pos = raw.find("\r\n\r\n");
+            if (pos != std::string::npos)
+                break;
+        } else if (n == 0) {
+            break;
+        } else {
+            close(fd);
+            return sendError(SERVER_ERROR, conn);
+        }
+    }
+
+    if (pos == std::string::npos) {
+        close(fd);
+        return sendError(SERVER_ERROR, conn);
+    }
+
+    headers = raw.substr(0, pos);
+    parseCGIHeaders(conn.res, headers);
+
+    size_t bodyStart = pos + 4;
+    std::string remainder = raw.substr(bodyStart);
+
+    conn.res.contentLength = toString(totalSize - bodyStart);
+
+    std::string responseHeader = generateHeader(conn.res);
+    conn.sendBuffer.append(responseHeader);
+
+    conn.sendBuffer.append(remainder);
+
+    conn.fileBuffer = fd;
+    conn.state = SENDING_FILE;
+
+    modifyToWrite(conn.fd);
 }

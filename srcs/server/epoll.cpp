@@ -1,7 +1,6 @@
 #include "webserv.h"
 
-void Server::addEvent(int fd, bool wantRead, bool wantWrite)
-{
+void Server::addEvent(int fd, bool wantRead, bool wantWrite) {
 #ifdef __linux__
     struct epoll_event ev;
     ev.events = 0;

@@ -16,12 +16,13 @@ void Server::handleRead(Connection& conn) {
 
 void Server::handleWrite(Connection& conn) {
     conn.lastActivityTime = std::time(NULL);
-
+    log(ERROR, "IN WRITE");
     ssize_t n = send(conn.fd,
                      conn.sendBuffer.data(),
                      conn.sendBuffer.size(),
                      0);
-
+    std::cout << "N = " << n << std::endl;
+    std::cout << "State = " << conn.state << std::endl;
     if (n > 0) {
         conn.sendBuffer.consume(n);
     } else if (n == 0) {
@@ -35,6 +36,7 @@ void Server::handleWrite(Connection& conn) {
     if (conn.sendBuffer.empty()) {
         modifyToRead(conn.fd);
     }
+    log(ERROR, "Exited from write");
 }
 
 void Server::handleClient(Event& event) {

@@ -188,7 +188,13 @@ void Server::checkCGIProcesses() {
         pid_t result = waitpid(it->pid, &status, WNOHANG);
 
         if (result > 0) {
-            handleCGIRead(*(it->conn));
+            log(WARNING, "Process exited");
+            std::cout << "Status: " << status << std::endl;
+
+            if (it->conn) {
+                handleCGIRead(*(it->conn), it->tmpFilePath);
+            }
+
             it = cgiProcesses_.erase(it);
         } else {
             ++it;
@@ -229,27 +235,6 @@ void Server::loop() {
 #endif
 
             Event& ev = events[i];
-
-            // -------- CGI PIPE HANDLING --------
-            std::map<int, Connection*>::iterator it = cgiFdMap_.find(fd);
-            if (it != cgiFdMap_.end()) {
-                Connection* conn = it->second;
-#ifdef __linux__
-                if (events[i].events & EPOLLOUT)
-                    handleCGIWrite(*conn);
-
-                if (events[i].events & EPOLLIN)
-                    handleCGIRead(*conn);
-#elif __APPLE__
-                if (events[i].filter == EVFILT_WRITE)
-                    handleCGIWrite(*conn);
-
-                if (events[i].filter == EVFILT_READ)
-                    handleCGIRead(*conn);
-#endif
-                continue;
-            }
-            // -----------------------------------
 
             if (fd == serverFd_) {
                 acceptConnection();
