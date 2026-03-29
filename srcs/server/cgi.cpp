@@ -71,9 +71,9 @@ char** Server::createEnvironment(const Request& req) {
     }
 
     env[i] = NULL;
-    //for (int j = 0; j < i; j++) {
-    //    std::cout << env[j] << std::endl;
-    //}
+    for (int j = 0; j < i; j++) {
+        std::cout << env[j] << std::endl;
+    }
     return env;
 }
 
@@ -83,6 +83,8 @@ void Server::runCGI(const char* cgiPath, Connection& conn) {
     if (tmpFd == -1)
         return log(ERROR, "Failed to create tmp file");
     close(tmpFd);
+    std::cout << "Running cgi\n";
+    std::cout << "Out: " << tmpl << std::endl;
 
     pid_t pid = fork();
     if (pid < 0)
@@ -98,11 +100,14 @@ void Server::runCGI(const char* cgiPath, Connection& conn) {
         close(outFd);
 
         if (conn.req.method == "POST") {
+            std::cout << "Opening " << conn.req.tempFilePath << std::endl;
             int fd = open(conn.req.tempFilePath.c_str(), O_RDONLY);
+            std::cout << "Fd = " << fd << std::endl;
             if (fd == -1)
                 _exit(1);
 
             dup2(fd, STDIN_FILENO);
+            std::cout << "Dubed\n";
             close(fd);
         }
 
@@ -110,6 +115,7 @@ void Server::runCGI(const char* cgiPath, Connection& conn) {
                          const_cast<char*>(conn.req.path.c_str()),
                          NULL};
         char** env = createEnvironment(conn.req);
+        std::cout << "Running " << cgiPath << std::endl;
         execve(cgiPath, argv, env);
         _exit(1);
     }
@@ -164,6 +170,7 @@ void Server::handleCGIRead(Connection& conn, const std::string& tmpFilePath) {
     std::string headers;
     char buf[BUFFER_SIZE];
 
+    std::cout << "Opening " << tmpFilePath << std::endl;
     int fd = open(tmpFilePath.c_str(), O_RDONLY);
     if (fd < 0) {
         log(ERROR, "Can't open file");
@@ -181,6 +188,7 @@ void Server::handleCGIRead(Connection& conn, const std::string& tmpFilePath) {
 
     while (true) {
         ssize_t n = read(fd, buf, BUFFER_SIZE);
+        std::cout << n << std::endl;
         if (n > 0) {
             raw.append(buf, n);
 
@@ -196,8 +204,10 @@ void Server::handleCGIRead(Connection& conn, const std::string& tmpFilePath) {
     }
 
     if (pos == std::string::npos) {
-        close(fd);
-        return sendError(SERVER_ERROR, conn);
+        conn.res.contentLength = "0";
+        conn.sendBuffer.append(generateHeader(conn.res));
+        modifyToWrite(conn.fd);
+        return;
     }
 
     headers = raw.substr(0, pos);
@@ -210,7 +220,7 @@ void Server::handleCGIRead(Connection& conn, const std::string& tmpFilePath) {
 
     std::string responseHeader = generateHeader(conn.res);
     conn.sendBuffer.append(responseHeader);
-
+    std::cout << "Body: " << remainder << std::endl;
     conn.sendBuffer.append(remainder);
 
     conn.fileBuffer = fd;

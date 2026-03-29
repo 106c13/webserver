@@ -101,22 +101,17 @@ class	Server {
 		// variables
 		std::map<int, Connection>	connections_;
 		std::vector<CGIProcess>		cgiProcesses_;
-		std::vector<int>			cgiQueue_;
 		int							serverFd_;
 		int							epollFd_;
 		sockaddr_in					addr_;
 
 		void			initSocket();
 		void			acceptConnection();
+
 		void			handleClient(Event& event);
 		void			handleRead(Connection& conn);
 		void			handleWrite(Connection& conn);
-		void			modifyToWrite(int fd);
-		void			modifyToRead(int fd);
 		void			closeConnection(int fd);
-		void			runCGI(const char* cgiPath, Connection& conn);
-		void			sendCGIOutput(Connection& conn, int cgiFd);
-		void			handleRequest(Connection& conn);
 		int				resolvePath(std::string& path, LocationConfig& location);
 		LocationConfig&	resolveLocation(std::string& fs_path);
 		void			generateAutoindex(Connection& conn);
@@ -126,24 +121,25 @@ class	Server {
 		void			sendError(int code, Connection& conn);
 		char**			createEnvironment(const Request& req);
 		
-		void			finishBody(Connection& conn);
 		void			processBody(Connection& conn);
 		void			processChunkedBody(Connection& conn);
-		void			startBodyReading(Connection& conn, size_t endPos);
 		bool			handleMultipartUpload(Connection& conn, LocationConfig& location);
 		void			processHeaders(Connection& conn);
 		void			checkTimeOuts();
 
-		void			handleCGIRead(Connection& conn, const std::string& tmpFilePath);
-		void			handleCGIWrite(Connection& conn);
-		void			closeCgiFd(int& fd);
 		void			checkCGIProcesses();
-		void			startQueuedCGIs();
 		void			handleGet(Connection& conn);
 		void			handlePost(Connection& conn);
 		void			startBodyReading(Connection& conn);
-		void			addEvent(int fd, bool wantRead, bool wantWrite);
 		void			processFixedBody(Connection& conn);
+
+		void			runCGI(const char* cgiPath, Connection& conn);
+		void			handleCGIRead(Connection& conn, const std::string& tmpFilePath);
+		void			handleCGIWrite(Connection& conn);
+
+		void			modifyToWrite(int fd);
+		void			modifyToRead(int fd);
+		void			addEvent(int fd, bool wantRead, bool wantWrite);
 
 	public:
 		Server(const ServerConfig& config); // Start server with configurations from file

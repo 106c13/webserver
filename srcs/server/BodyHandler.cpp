@@ -72,6 +72,18 @@ void Server::startBodyReading(Connection& conn) {
     req.bodySize = 0;
     req.bodyReceived = 0;
     req.bodySent = 0;
+    
+    req.fileBuffer = openTempFile(req.tempFilePath);
+    std::cout << "Body will be saved to file: " << req.tempFilePath << std::endl;
+
+    if (isChunked(req)) {
+        req.transferType = CHUNKED;
+        conn.state = READING_BODY;
+        return;
+    }
+
+    if (req.fileBuffer < 0)
+        return sendError(SERVER_ERROR, conn);
 
     if (!parseContentLength(req))
         return sendError(BAD_REQUEST, conn);
@@ -79,13 +91,9 @@ void Server::startBodyReading(Connection& conn) {
     if (loc.hasClientMaxBodySize && req.bodySize > loc.clientMaxBodySize)
         return sendError(PAYLOAD_TOO_LARGE, conn);
 
-    req.fileBuffer = openTempFile(req.tempFilePath);
-    if (req.fileBuffer < 0)
-        return sendError(SERVER_ERROR, conn);
 
-    conn.req.transferType = FIXED;
+    req.transferType = FIXED;
     conn.state = READING_BODY;
-    std::cout << "Body will be saved to file: " << req.tempFilePath << std::endl;
 }
 
 void Server::processFixedBody(Connection& conn) {
@@ -113,6 +121,7 @@ void Server::processFixedBody(Connection& conn) {
 void Server::processChunkedBody(Connection& conn) {
     Request& req = conn.req;
     Buffer& buf = conn.recvBuffer;
+    LocationConfig& location = conn.location;
 
     while (true) {
         if (!conn.hasChunkSize) {
@@ -145,6 +154,9 @@ void Server::processChunkedBody(Connection& conn) {
 
         req.bodyReceived += n;
         buf.consume(conn.chunkSize);
+
+        if (location.hasClientMaxBodySize && location.clientMaxBodySize < req.bodyReceived)
+            return sendError(PAYLOAD_TOO_LARGE, conn);
 
         if (buf.size() < 2)
             return;

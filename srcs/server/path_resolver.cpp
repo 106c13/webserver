@@ -84,7 +84,11 @@ LocationConfig& Server::resolveLocation(std::string& fs_path) {
 		best = &config_.locations.front();
 	}
 
-    fs_path = best->root + "/" + fs_path.substr(best_len);
+    fs_path = fs_path.substr(best_len);
+    if (fs_path.size() > 0 && fs_path[0] == '/')
+        fs_path = best->root + fs_path;
+    else
+        fs_path = best->root + "/" + fs_path;
 
     return *best;
 }

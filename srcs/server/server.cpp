@@ -92,10 +92,14 @@ void Server::processHeaders(Connection& conn) {
         return sendError(status, conn);
 
     status = resolvePath(conn.req.path, conn.location);
+    std::cout << conn.req.path << std::endl;
+
+    std::string cgiPath = findCGI(conn.req.path, conn.location.cgi);
+
     if (status == DIRECTORY_NO_INDEX && conn.location.autoindex)
         return generateAutoindex(conn);
 
-    if (status != OK)
+    if (status != OK && cgiPath.empty() && !conn.location.root.empty())
         return sendError(status, conn);
     
     if (conn.location.redirectCode != 0)
@@ -239,7 +243,11 @@ void Server::loop() {
             if (fd == serverFd_) {
                 acceptConnection();
             } else {
-                handleClient(ev);
+                try {
+                    handleClient(ev);
+                } catch (std::exception& e) {
+                    std::cout << e.what() << std::endl;
+                }
             }
         }
     }
