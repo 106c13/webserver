@@ -44,7 +44,9 @@ void Server::handlePost(Connection& conn) {
     if (location.root.empty())
         return sendError(OK, conn);
 
-    std::string cgiPath = findCGI(req.path, location.cgi);
+    std::string cgiPath = findCGI(req.path, config_.cgi);
+    if (cgiPath.empty())
+        cgiPath = findCGI(req.path, location.cgi);
     if (!cgiPath.empty())
         return runCGI(cgiPath.c_str(), conn);
 

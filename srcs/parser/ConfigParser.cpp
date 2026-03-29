@@ -183,6 +183,18 @@ void ConfigParser::parseServer() {
 			server.clientMaxBodySize = parseSize(current().value);
 			expect(TOK_WORD, "Expected client max body size");
 			expect(TOK_SEMICOLON, "Expected ';' after client_max_body_size");
+		} else if (token_value == "cgi") {
+			next();
+			expect(TOK_LBRACE, "Expected '{' after cgi");
+			while (current().type != TOK_RBRACE) {
+				std::string extension = current().value;
+				expect(TOK_WORD, "Expected CGI extension");
+				std::string handler = current().value;
+				expect(TOK_WORD, "Expected CGI handler path");
+				server.cgi[extension] = handler;
+				expect(TOK_SEMICOLON, "Expected ';' after cgi entry");
+			}
+			expect(TOK_RBRACE, "Expected '}' after cgi block");
 		} else if (token_value == "location") {
 			parseLocation(server);
 		} else {

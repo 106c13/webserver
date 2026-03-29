@@ -94,7 +94,9 @@ void Server::processHeaders(Connection& conn) {
     status = resolvePath(conn.req.path, conn.location);
     std::cout << conn.req.path << std::endl;
 
-    std::string cgiPath = findCGI(conn.req.path, conn.location.cgi);
+    std::string cgiPath = findCGI(conn.req.path, config_.cgi);
+    if (cgiPath.empty())
+        cgiPath = findCGI(conn.req.path, conn.location.cgi);
 
     if (status == DIRECTORY_NO_INDEX && conn.location.autoindex)
         return generateAutoindex(conn);
