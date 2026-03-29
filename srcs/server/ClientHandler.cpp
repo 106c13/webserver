@@ -48,19 +48,11 @@ void Server::handleClient(Event& event) {
 #endif
     Connection& conn = connections_[fd];
 
-#ifdef __linux__
-    if (event.events & EPOLLIN)
+    if (IS_EVENT_READ(event))
         handleRead(conn);
 
-    if (event.events & EPOLLOUT)
+    if (IS_EVENT_WRITE(event))
         handleWrite(conn);
-#elif __APPLE__
-    if (event.events & EVFILT_READ)
-        handleRead(conn);
-
-    if (event.events & EVFILT_WRITE)
-        handleWrite(conn);
-#endif
 
     if (conn.state == CLOSED)
         return closeConnection(conn.fd);

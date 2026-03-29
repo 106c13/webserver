@@ -371,6 +371,12 @@ void ConfigParser::print() const {
 			std::cout << "    " << it->first << " -> " << it->second << std::endl;
 		}
 
+		std::cout << "  Server-level CGI:" << std::endl;
+		for (std::map<std::string, std::string>::const_iterator it = server.cgi.begin();
+			 it != server.cgi.end(); ++it) {
+			std::cout << "    " << it->first << " -> " << it->second << std::endl;
+		}
+
 		std::cout << "  Locations: " << server.locations.size() << std::endl;
 		for (size_t j = 0; j < server.locations.size(); ++j) {
 			const LocationConfig& loc = server.locations[j];

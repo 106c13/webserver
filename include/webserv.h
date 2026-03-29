@@ -30,6 +30,8 @@ typedef struct epoll_event Event;
 #define EVENT_ADD EPOLL_CTL_ADD
 #define EVENT_MOD EPOLL_CTL_MOD
 #define EVENT_DEL EPOLL_CTL_DEL
+#define IS_EVENT_READ(e) ((e).events & EPOLLIN)
+#define IS_EVENT_WRITE(e) ((e).events & EPOLLOUT)
 #elif __APPLE__
 typedef struct kevent Event;
 #define EVENT_READ EVFILT_READ
@@ -37,6 +39,8 @@ typedef struct kevent Event;
 #define EVENT_ADD EV_ADD
 #define EVENT_MOD EV_ADD
 #define EVENT_DEL EV_DELETE
+#define IS_EVENT_READ(e) ((e).filter == EVFILT_READ)
+#define IS_EVENT_WRITE(e) ((e).filter == EVFILT_WRITE)
 #endif
 
 
