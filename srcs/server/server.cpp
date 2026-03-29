@@ -203,6 +203,7 @@ void Server::checkCGIProcesses() {
                 handleCGIRead(*(it->conn), it->tmpFilePath);
             }
 
+            std::remove(it->tmpFilePath.c_str());
             it = cgiProcesses_.erase(it);
         } else {
             ++it;
