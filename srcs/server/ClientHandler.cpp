@@ -11,32 +11,29 @@ void Server::handleRead(Connection& conn) {
     if (n > 0)
         conn.recvBuffer.append(buf, n);
     else if (n == 0)
-        return closeConnection(conn.fd);
+        conn.state = CLOSED;
 }
 
 void Server::handleWrite(Connection& conn) {
     conn.lastActivityTime = std::time(NULL);
-    log(ERROR, "IN WRITE");
     ssize_t n = send(conn.fd,
                      conn.sendBuffer.data(),
                      conn.sendBuffer.size(),
                      0);
-    std::cout << "N = " << n << std::endl;
-    std::cout << "State = " << conn.state << std::endl;
     if (n > 0) {
         conn.sendBuffer.consume(n);
-    } else if (n == 0) {
-        return closeConnection(conn.fd);
+    } else if (n <= 0) {
+        conn.state = CLOSED;
+        return;
     }
 
     if (conn.state == SENDING_FILE) {
         streamFileChunk(conn);
     }
-    
+
     if (conn.sendBuffer.empty()) {
         modifyToRead(conn.fd);
     }
-    log(ERROR, "Exited from write");
 }
 
 void Server::handleClient(Event& event) {
@@ -46,10 +43,17 @@ void Server::handleClient(Event& event) {
 #elif __APPLE__
     fd = (int)event.ident;
 #endif
+
+    if (connections_.find(fd) == connections_.end())
+        return;
+
     Connection& conn = connections_[fd];
 
     if (IS_EVENT_READ(event))
         handleRead(conn);
+
+    if (conn.state == CLOSED)
+        return closeConnection(conn.fd);
 
     if (IS_EVENT_WRITE(event))
         handleWrite(conn);

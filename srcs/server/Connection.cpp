@@ -1,5 +1,6 @@
 #include <fcntl.h>
 #include <ctime>
+#include <cstdio>
 #include "webserv.h"
 #include "ConfigParser.h"
 
@@ -12,11 +13,12 @@ void Server::checkTimeOuts() {
         size_t diff = std::time(NULL) - conn.lastActivityTime;
 
         if ((conn.state == READING_HEADER && diff > HEADER_TIMEOUT) ||
-            ((conn.state == READING_BODY || conn.state == READING_CHUNKS) && diff > BODY_TIMEOUT)) 
+            ((conn.state == READING_BODY || conn.state == READING_CHUNKS) && diff > BODY_TIMEOUT))
         {
-            conn.state = CLOSED;
             sendError(REQUEST_TIMEOUT, conn);
-            std::map<int, Connection>::iterator toErase = it++;
+            int fd = it->first;
+            ++it;
+            closeConnection(fd);
         } else
             ++it;
     }
@@ -62,13 +64,14 @@ void Server::closeConnection(int fd) {
     EV_SET(&ev, fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
     kevent(epollFd_, &ev, 1, NULL, 0, NULL);
 #endif
-    // Graceful close: signal we're done writing, then drain any
-    // remaining data so close() sends FIN instead of RST.
-    shutdown(fd, SHUT_WR);
-    char drain[4096];
-    while (recv(fd, drain, sizeof(drain), 0) > 0)
-        ;
+    std::map<int, Connection>::iterator it = connections_.find(fd);
+    if (it != connections_.end()) {
+        Connection& conn = it->second;
+        if (conn.fileBuffer > 0)
+            close(conn.fileBuffer);
+        if (!conn.req.tempFilePath.empty())
+            std::remove(conn.req.tempFilePath.c_str());
+    }
     close(fd);
     connections_.erase(fd);
-    std::cout << "Client disconnected..." << std::endl;
 }
