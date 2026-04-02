@@ -1,5 +1,5 @@
-#include <fcntl.h>
 #include <cstdio>
+#include <fcntl.h>
 #include "webserv.h"
 #include "ConfigParser.h"
 
@@ -39,7 +39,6 @@ void Server::handlePost(Connection& conn) {
 
     res.path = req.path;
     conn.state = PROCESSING;
-    std::cout << "In handlePost\n";
 
     if (location.root.empty())
         return sendError(OK, conn);
@@ -67,10 +66,9 @@ void Server::handleGet(Connection& conn) {
 
     res.path = req.path;
 
-    //std::string cgiPath = findCGI(req.path, location.cgi);
-    //if (!cgiPath.empty())
-        //return sendError(METHOD_NOT_ALLOWED, conn);
-        //return runCGI(cgiPath.c_str(), conn);
+    std::string cgiPath = findCGI(req.path, location.cgi);
+    if (!cgiPath.empty())
+        return runCGI(cgiPath.c_str(), conn);
 
     if (!prepareFileResponse(conn, req.path))
         return sendError(SERVER_ERROR, conn);

@@ -149,6 +149,5 @@ std::string generateHeader(const struct Response& res) {
     header += "Connection: " + res.connectionType + "\r\n";
     header += "\r\n";
 
-    std::cout << header;
 	return header;
 }

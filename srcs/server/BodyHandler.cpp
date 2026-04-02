@@ -1,31 +1,6 @@
-#include <unistd.h>
-#include <cstdlib>
-#include <cstring>
 #include "ConfigParser.h"
 #include "defines.h"
 #include "webserv.h"
-
-static bool chunkedBodyComplete(const Buffer& buf, size_t& endPos) {
-    const char* data = buf.data();
-    size_t len = buf.size();
-
-    if (len < 5)
-        return false;
-
-
-    for (size_t i = 0; i + 4 < len; ++i) {
-        if (data[i] == '0' &&
-            data[i+1] == '\r' &&
-            data[i+2] == '\n' &&
-            data[i+3] == '\r' &&
-            data[i+4] == '\n')
-        {
-            endPos = i + 5;
-            return true;
-        }
-    }
-    return false;
-}
 
 static bool parseContentLength(Request& req) {
     StringMap::iterator it = req.headers.find("Content-Length");
@@ -50,21 +25,6 @@ static bool isChunked(const Request& req) {
     return (it != req.headers.end() && it->second == "chunked");
 }
 
-static bool writeToFile(int fd, const char* data, size_t size) {
-    size_t written = 0;
-
-    while (written < size) {
-        ssize_t n = write(fd, data + written, size - written);
-
-        if (n > 0)
-            written += n;
-        else if (n == -1)
-            return false;
-    }
-
-    return true;
-}
-
 void Server::startBodyReading(Connection& conn) {
     Request& req = conn.req;
     LocationConfig& loc = conn.location;
@@ -74,7 +34,6 @@ void Server::startBodyReading(Connection& conn) {
     req.bodySent = 0;
     
     req.fileBuffer = openTempFile(req.tempFilePath);
-    std::cout << "Body will be saved to file: " << req.tempFilePath << std::endl;
 
     if (isChunked(req)) {
         req.transferType = CHUNKED;
@@ -174,7 +133,6 @@ void Server::processBody(Connection& conn) {
         processFixedBody(conn);
     else
         processChunkedBody(conn);
-    std::cout << conn.req.bodyReceived << std::endl;
 }
 
 int openTempFile(std::string& path) {

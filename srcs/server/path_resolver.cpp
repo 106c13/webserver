@@ -4,7 +4,7 @@
 #include "webserv.h"
 #include "defines.h"
 
-int Server::resolvePath(std::string& path, LocationConfig& location) {
+int resolvePath(std::string& path, LocationConfig& location) {
     struct stat st;
     std::string tmp;
 
@@ -55,7 +55,7 @@ int Server::resolvePath(std::string& path, LocationConfig& location) {
     return OK;
 }
 
-LocationConfig& Server::resolveLocation(std::string& fs_path) {
+LocationConfig& resolveLocation(std::string& fs_path, LocationList& locations) {
     LocationConfig* best = NULL;
     size_t best_len = 0;
 
@@ -63,8 +63,8 @@ LocationConfig& Server::resolveLocation(std::string& fs_path) {
     if (fs_path.size() > 1 && fs_path[fs_path.size() - 1] == '/')
         fs_path.erase(fs_path.length() - 1);
 
-    for (LocationList::iterator it = config_.locations.begin();
-         it != config_.locations.end();
+    for (LocationList::iterator it = locations.begin();
+         it != locations.end();
          ++it) {
 
         const std::string& loc_path = it->path;
@@ -78,10 +78,10 @@ LocationConfig& Server::resolveLocation(std::string& fs_path) {
     }
 
     if (!best) {
-		if (config_.locations.empty()) {
+		if (locations.empty()) {
 			throw std::runtime_error("No locations configured");
         }
-		best = &config_.locations.front();
+		best = &locations.front();
 	}
 
     fs_path = fs_path.substr(best_len);

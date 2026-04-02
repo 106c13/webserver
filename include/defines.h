@@ -25,10 +25,6 @@ enum Log {
 	ERROR = 12
 };
 
-enum Method {
-	GET = 358774,
-	POST = 101
-};
 
 enum Page {
 	OK = 200,

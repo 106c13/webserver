@@ -18,41 +18,32 @@ void log(int type, const std::string& msg) {
     std::string time = getTime();
 
     if (type == INFO) {
-        std::cout << COLOR_GREEN
-                  << "[" << time << "] "
+        std::cout << "[" << time << "] "
+                  << COLOR_GREEN
                   << "[INFO] "
-                  << msg
                   << COLOR_RESET
-                  << std::endl;
+                  << msg
+                  << "\n";
 
     } else if (type == ERROR) {
-        std::cerr << COLOR_RED
-                  << "[" << time << "] "
+        std::cerr << "[" << time << "] "
+                  << COLOR_RED
                   << "[ERROR] "
                   << msg
                   << COLOR_RESET
-                  << std::endl;
+                  << "\n";
 
     } else if (type == WARNING) {
-        std::cerr << COLOR_YELLOW
-                  << "[" << time << "] "
+        std::cout << "[" << time << "] "
+                  << COLOR_YELLOW
                   << "[WARNING] "
                   << msg
                   << COLOR_RESET
-                  << std::endl;
+                  << "\n";
     }
 }
 
-bool fileExists(const std::string& path) {
-    return (access(path.c_str(), F_OK) == 0);
-}
-
-bool canReadFile(const std::string& path) {
-	return (access(path.c_str(), R_OK) == 0);
-}
-
-ssize_t getFileSize(const std::string& path)
-{
+ssize_t getFileSize(const std::string& path) {
 	struct stat st;
 
 	if (stat(path.c_str(), &st) < 0) {
@@ -82,8 +73,7 @@ std::string readFile(const std::string& filename) {
 	return content;
 }
 
-static int detectType(const std::string& name, bool is_dir)
-{
+static int detectType(const std::string& name, bool is_dir) {
     if (is_dir) {
         return 1;
 	}

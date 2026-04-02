@@ -1,4 +1,5 @@
 #include <unistd.h>  
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
@@ -77,11 +78,10 @@ void Server::processHeaders(Connection& conn) {
     conn.req.header.assign(conn.recvBuffer.data(), endPos); //TODO maybe remove this?
     conn.recvBuffer.consume(endPos);
 
-    std::cout << conn.req.header;
     parser_.parse(conn.req.header);
     conn.req = parser_.getRequest();
 
-    conn.location = resolveLocation(conn.req.path);
+    conn.location = resolveLocation(conn.req.path, config_.locations);
 
     log(INFO, conn.req.version + " " + conn.req.method + " " + conn.req.uri);
 
@@ -98,7 +98,6 @@ void Server::processHeaders(Connection& conn) {
     }
 
     status = resolvePath(conn.req.path, conn.location);
-    std::cout << conn.req.path << std::endl;
 
     if (status == DIRECTORY_NO_INDEX && conn.location.autoindex)
         return generateAutoindex(conn);
@@ -125,6 +124,7 @@ static void setupConnection(Connection& conn, int fd) {
 }
 
 void Server::acceptConnection() {
+	std::ostringstream oss;
     sockaddr_in addr;
     socklen_t len = sizeof(addr);
 
@@ -147,14 +147,20 @@ void Server::acceptConnection() {
         kevent(epollFd_, &ev, 1, NULL, 0, NULL);
 #endif
         setupConnection(connections_[clientFd], clientFd);
-        std::cout << "New connection..." << std::endl;
+
+        char ip[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
+
+        int port = ntohs(addr.sin_port);
+        oss << "New connection from "
+                  << ip << ":" << port;
+        log(INFO, oss.str());
     }
 }
 
 void Server::initSocket() {
 	std::ostringstream oss;
 
-	log(INFO, "Starting server");
 	serverFd_ = socket(AF_INET, SOCK_STREAM, 0);
 
 	if (serverFd_ < 0) {
@@ -196,9 +202,6 @@ void Server::checkCGIProcesses() {
         pid_t result = waitpid(it->pid, &status, WNOHANG);
 
         if (result > 0) {
-            log(WARNING, "Process exited");
-            std::cout << "Status: " << status << std::endl;
-
             if (it->conn) {
                 handleCGIRead(*(it->conn), it->tmpFilePath);
             }

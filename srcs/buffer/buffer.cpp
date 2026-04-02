@@ -3,8 +3,8 @@
 #include "Buffer.h"
 
 Buffer::Buffer() {
-	data_ = new char[1024000];
-	cap_ = 1024000;
+	data_ = new char[1024];
+	cap_ = 1024;
 	start_ = 0;
 	end_ = 0;
 }
@@ -51,8 +51,12 @@ const char* Buffer::data() const {
 }
 
 void Buffer::append(const char* buf, size_t len) {
-    if (cap_ - end_ < len) {
-        size_t new_cap = cap_ + len + 1024 * 1000;
+    if (start_ > 0 && start_ + (cap_ - end_)> len) {
+        memmove(data_, data_ + start_, end_ - start_);
+        end_ -= start_;
+        start_ = 0;
+    } else if (cap_ - end_ < len) {
+        size_t new_cap = cap_ + len + 1024;
         char* tmp = new char[new_cap];
 
         size_t cur_size = end_ - start_;

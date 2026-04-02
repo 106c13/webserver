@@ -1,4 +1,5 @@
 #include <cerrno>
+#include <ctime>
 #include "webserv.h"
 #include "Buffer.h"
 

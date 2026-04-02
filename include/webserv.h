@@ -2,21 +2,19 @@
 #define WEBSERV_H
 
 #include <iostream>
-#include <string>
 #include <sys/socket.h>
+
 #ifdef __linux__
 #include <sys/epoll.h>
 #elif __APPLE__
 #include <sys/event.h>
 #include <sys/time.h>
 #endif
+
+#include <string>
 #include <netinet/in.h>
 #include <unistd.h>
-#include <exception>
 #include <dirent.h>
-#include <cstddef>
-#include <cstring> 
-#include <ctime>
 #include "ConfigParser.h"
 #include "RequestParser.h"
 #include "HeaderGenerator.h"
@@ -116,26 +114,25 @@ class	Server {
 		void			handleRead(Connection& conn);
 		void			handleWrite(Connection& conn);
 		void			closeConnection(int fd);
-		int				resolvePath(std::string& path, LocationConfig& location);
-		LocationConfig&	resolveLocation(std::string& fs_path);
 		void			generateAutoindex(Connection& conn);
 		void			sendRedirect(Connection& conn);
 		bool			prepareFileResponse(Connection& conn, const std::string& path);
 		bool			streamFileChunk(Connection& conn);
 		void			sendError(int code, Connection& conn);
-		char**			createEnvironment(const Request& req);
 		
+		void			startBodyReading(Connection& conn);
 		void			processBody(Connection& conn);
+		void			processFixedBody(Connection& conn);
 		void			processChunkedBody(Connection& conn);
+
 		bool			handleMultipartUpload(Connection& conn, LocationConfig& location);
 		void			processHeaders(Connection& conn);
-		void			checkTimeOuts();
 
+		void			checkTimeOuts();
 		void			checkCGIProcesses();
+
 		void			handleGet(Connection& conn);
 		void			handlePost(Connection& conn);
-		void			startBodyReading(Connection& conn);
-		void			processFixedBody(Connection& conn);
 
 		void			runCGI(const char* cgiPath, Connection& conn);
 		void			handleCGIRead(Connection& conn, const std::string& tmpFilePath);
@@ -152,12 +149,10 @@ class	Server {
 		void		loop();
 };
 
+int						resolvePath(std::string& path, LocationConfig& location);
 void					log(int type, const std::string& msg);
-
-bool					fileExists(const std::string& path);
-bool					canReadFile(const std::string& path);
+LocationConfig&			resolveLocation(std::string& fs_path, LocationList& locations);
 ssize_t					getFileSize(const std::string& path);
-std::string				readFile(const std::string& filename);
 std::vector<DirEntry>	listDirectory(const std::string& path);
 std::string				toString(size_t n);
 std::string				findCGI(const std::string& fileName, const StringMap& cgiMap);

@@ -2,12 +2,8 @@
 #include <sstream>
 #include "webserv.h"
 
-// ── DirEntry type constants ──────────────────────────────────────────────────
-
 static const int ENTRY_DIR   = 1;
 static const int ENTRY_IMAGE = 2;
-
-// ── internal helpers ─────────────────────────────────────────────────────────
 
 static std::string humanSize(size_t bytes) {
     const char* units[] = {"B", "KB", "MB", "GB"};

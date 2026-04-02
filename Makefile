@@ -1,12 +1,5 @@
 NAME = webserv
 
-# ---------- Temprorary -----------
-CGI_SRC = cgi/test.c
-CGI_BIN = php-cgi
-CC = cc
-CFLAGS = -Wall -Wextra -Werror
-# ---------------------------------
-
 SRCS_DIR = srcs/
 OBJS_DIR = obj/
 INCLUDES = include/
@@ -30,7 +23,7 @@ SRC = \
 OBJ = $(patsubst $(SRCS_DIR)%.cpp, $(OBJS_DIR)%.o, $(SRC))
 
 CXX = c++
-CXXFLAGS =  -std=c++98 -I $(INCLUDES)
+CXXFLAGS =  -std=c++98 -Wall -Wextra -Werror -I $(INCLUDES)
 
 
 GREEN = \033[1;32m
@@ -42,13 +35,6 @@ RESET = \033[0m
 
 all: $(NAME) $(CGI_BIN)
 
-# ---------- Temprorary -----------
-$(CGI_BIN): $(CGI_SRC)
-	@echo "$(CYAN)[Compiling CGI]$(RESET) $<"
-	@$(CC) $(CFLAGS) $< -o $(CGI_BIN)
-	@echo "$(GREEN)✅ CGI ready: ./$(CGI_BIN)$(RESET)"
-# ---------------------------------
-#
 $(NAME): $(OBJ)
 	@echo "$(YELLOW)🔧 Linking $(NAME)...$(RESET)"
 	@$(CXX) $(CXXFLAGS) $(OBJ) -o $(NAME)
