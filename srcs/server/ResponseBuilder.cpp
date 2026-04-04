@@ -6,7 +6,6 @@
 static void flushHeader(Connection& conn) {
     std::string header = generateHeader(conn.res);
     conn.sendBuffer.append(header);
-    log(INFO, header.substr(0, header.find("\n")));
 }
 
 void Server::sendRedirect(Connection& conn) {

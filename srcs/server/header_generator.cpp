@@ -148,6 +148,6 @@ std::string generateHeader(const struct Response& res) {
 
     header += "Connection: " + res.connectionType + "\r\n";
     header += "\r\n";
-
+    log(INFO, header.substr(0, header.find("\n")));
 	return header;
 }
