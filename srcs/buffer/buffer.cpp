@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <iostream>
 #include <cstring>
 #include "Buffer.h"
 

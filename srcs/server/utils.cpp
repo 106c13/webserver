@@ -53,26 +53,6 @@ ssize_t getFileSize(const std::string& path) {
 	return st.st_size;
 }
 
-std::string readFile(const std::string& filename) {
-	int         fd;
-	char        buffer[1024];
-	ssize_t     bytes;
-	std::string content;
-
-	fd = open(filename.c_str(), O_RDONLY);
-
-	if (fd < 0) {
-		return "";
-	}
-
-	while ((bytes = read(fd, buffer, sizeof(buffer))) > 0) {
-		content.append(buffer, bytes);
-	}
-
-	close(fd);
-	return content;
-}
-
 static int detectType(const std::string& name, bool is_dir) {
     if (is_dir) {
         return 1;

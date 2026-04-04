@@ -155,6 +155,8 @@ void Server::acceptConnection() {
         oss << "New connection from "
                   << ip << ":" << port;
         log(INFO, oss.str());
+        oss.str("");
+        oss.clear();
     }
 }
 
