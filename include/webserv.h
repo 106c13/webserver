@@ -46,25 +46,17 @@ enum ConnState {
     READING_HEADER = 52,
     READING_BODY = 51,
 	SENDING_FILE = 50,
-
-    READING_CHUNKS = 49,
-    READING_CHUNK_SIZE = 48,
-    READING_CHUNK_DATA = 47,
-    READING_CHUNK_CRLF = 46,
     PROCESSING = 45,
     SENDING_RESPONSE = 44,
     TIMEOUT = 43,
     CLOSED = 42,
 };
 
-struct CGIProcess;
-
 struct Connection {
     int         	fd;
 	ConnState		state;
 
-    Buffer			recvBuffer;
-    Buffer			sendBuffer;
+    Buffer			buffer;
 	int				fileBuffer;
 
     Request			req;
@@ -73,8 +65,8 @@ struct Connection {
 
 	time_t			lastActivityTime;
 
-	size_t chunkSize;
-	bool   hasChunkSize;
+	size_t			chunkSize;
+	bool			hasChunkSize;
 };
 
 struct CGIProcess {
@@ -85,7 +77,6 @@ struct CGIProcess {
     CGIProcess(pid_t p, const std::string& path, Connection* c)
         : pid(p), tmpFilePath(path), conn(c) {}
 };
-
 
 struct DirEntry {
 	int			type;
@@ -143,10 +134,10 @@ class	Server {
 		void			addEvent(int fd, bool wantRead, bool wantWrite);
 
 	public:
-		Server(const ServerConfig& config); // Start server with configurations from file
+		Server(const ServerConfig& config);
 		~Server();
 
-		void		loop();
+		void			loop();
 };
 
 int						resolvePath(std::string& path, LocationConfig& location);

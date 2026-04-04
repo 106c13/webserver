@@ -131,7 +131,7 @@ static const char* generateDefaultPage(int code, size_t* pageSize) {
 void Server::sendError(int code, Connection& conn) {
     Response& res = conn.res;
 
-	conn.sendBuffer.clear();
+	conn.buffer.clear();
 
 	if (code == DIRECTORY_NO_INDEX)
 		code = NOT_FOUND;
@@ -164,8 +164,8 @@ void Server::sendError(int code, Connection& conn) {
     page = generateDefaultPage(code, &pageSize);	
     res.contentLength = toString(pageSize);
     std::string header = generateHeader(res);
-    conn.sendBuffer.append(header);
-    conn.sendBuffer.append(page, pageSize);
+    conn.buffer.append(header);
+    conn.buffer.append(page, pageSize);
 	conn.state = SENDING_RESPONSE;
 
     modifyToWrite(conn.fd);

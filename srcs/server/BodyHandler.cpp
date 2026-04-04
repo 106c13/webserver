@@ -57,7 +57,7 @@ void Server::startBodyReading(Connection& conn) {
 
 void Server::processFixedBody(Connection& conn) {
     Request& req = conn.req;
-    Buffer& buf = conn.recvBuffer;
+    Buffer& buf = conn.buffer;
 
     size_t remaining = req.bodySize - req.bodyReceived;
     size_t available = buf.size();
@@ -79,7 +79,7 @@ void Server::processFixedBody(Connection& conn) {
 
 void Server::processChunkedBody(Connection& conn) {
     Request& req = conn.req;
-    Buffer& buf = conn.recvBuffer;
+    Buffer& buf = conn.buffer;
     LocationConfig& location = conn.location;
 
     while (true) {

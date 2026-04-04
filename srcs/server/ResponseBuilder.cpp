@@ -5,7 +5,7 @@
 
 static void flushHeader(Connection& conn) {
     std::string header = generateHeader(conn.res);
-    conn.sendBuffer.append(header);
+    conn.buffer.append(header);
 }
 
 void Server::sendRedirect(Connection& conn) {
@@ -32,8 +32,9 @@ bool Server::prepareFileResponse(Connection& conn, const std::string& path) {
     res.contentLength = toString(size);
     res.connectionType = "close";
 
-    flushHeader(conn);
 
+    conn.buffer.clear();
+    flushHeader(conn);
     conn.fileBuffer = fd;
     conn.state = SENDING_FILE;
     return true;
@@ -47,7 +48,7 @@ bool Server::streamFileChunk(Connection& conn) {
     ssize_t n = read(conn.fileBuffer, buf, sizeof(buf));
 
     if (n > 0) {
-        conn.sendBuffer.append(buf, n);
+        conn.buffer.append(buf, n);
         return true;
     }
 

@@ -10,7 +10,7 @@ void Server::handleRead(Connection& conn) {
     ssize_t n = recv(conn.fd, buf, sizeof(buf), 0);
 
     if (n > 0)
-        conn.recvBuffer.append(buf, n);
+        conn.buffer.append(buf, n);
     else if (n == 0)
         conn.state = CLOSED;
 }
@@ -18,11 +18,11 @@ void Server::handleRead(Connection& conn) {
 void Server::handleWrite(Connection& conn) {
     conn.lastActivityTime = std::time(NULL);
     ssize_t n = send(conn.fd,
-                     conn.sendBuffer.data(),
-                     conn.sendBuffer.size(),
+                     conn.buffer.data(),
+                     conn.buffer.size(),
                      0);
     if (n > 0) {
-        conn.sendBuffer.consume(n);
+        conn.buffer.consume(n);
     } else if (n <= 0) {
         conn.state = CLOSED;
         return;
@@ -32,7 +32,7 @@ void Server::handleWrite(Connection& conn) {
         streamFileChunk(conn);
     }
 
-    if (conn.sendBuffer.empty()) {
+    if (conn.buffer.empty()) {
         modifyToRead(conn.fd);
     }
 }
@@ -56,7 +56,7 @@ void Server::handleClient(Event& event) {
     if (conn.state == CLOSED)
         return closeConnection(conn.fd);
 
-    if (IS_EVENT_WRITE(event))
+    if ((conn.state == SENDING_FILE || conn.state == SENDING_RESPONSE) && IS_EVENT_WRITE(event))
         handleWrite(conn);
 
     if (conn.state == CLOSED)

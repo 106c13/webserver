@@ -60,8 +60,6 @@ static std::string buildAutoindexPage(const std::string& path,
     return page.str();
 }
 
-// ── Server method ────────────────────────────────────────────────────────────
-
 void Server::generateAutoindex(Connection& conn) {
     std::string path = conn.req.uri;
     if (path.empty() || path[path.size() - 1] != '/')
@@ -76,8 +74,9 @@ void Server::generateAutoindex(Connection& conn) {
     res.contentLength  = toString(page.size());
     res.connectionType = "close";
 
-    conn.sendBuffer.append(generateHeader(res));
-    conn.sendBuffer.append(page);
+    conn.buffer.clear();
+    conn.buffer.append(generateHeader(res));
+    conn.buffer.append(page);
     conn.state = SENDING_RESPONSE;
     modifyToWrite(conn.fd);
 }

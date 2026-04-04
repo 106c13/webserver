@@ -192,9 +192,11 @@ void Server::handleCGIRead(Connection& conn, const std::string& tmpFilePath) {
         }
     }
 
+    conn.buffer.clear();
+
     if (pos == std::string::npos) {
         conn.res.contentLength = "0";
-        conn.sendBuffer.append(generateHeader(conn.res));
+        conn.buffer.append(generateHeader(conn.res));
         modifyToWrite(conn.fd);
         return;
     }
@@ -208,8 +210,8 @@ void Server::handleCGIRead(Connection& conn, const std::string& tmpFilePath) {
     conn.res.contentLength = toString(totalSize - bodyStart);
 
     std::string responseHeader = generateHeader(conn.res);
-    conn.sendBuffer.append(responseHeader);
-    conn.sendBuffer.append(remainder);
+    conn.buffer.append(responseHeader);
+    conn.buffer.append(remainder);
 
     conn.fileBuffer = fd;
     conn.state = SENDING_FILE;

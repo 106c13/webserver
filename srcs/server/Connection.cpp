@@ -13,7 +13,7 @@ void Server::checkTimeOuts() {
         size_t diff = std::time(NULL) - conn.lastActivityTime;
 
         if ((conn.state == READING_HEADER && diff > HEADER_TIMEOUT) ||
-            ((conn.state == READING_BODY || conn.state == READING_CHUNKS) && diff > BODY_TIMEOUT))
+            ((conn.state == READING_BODY) && diff > BODY_TIMEOUT))
         {
             sendError(REQUEST_TIMEOUT, conn);
             int fd = it->first;

@@ -66,8 +66,8 @@ static int deleteResource(const std::string& path) {
 void Server::processHeaders(Connection& conn) {
     size_t endPos;
 
-    if (!requestComplete(conn.recvBuffer, endPos)) {
-        if (conn.recvBuffer.size() > MAX_HEADER_SIZE)
+    if (!requestComplete(conn.buffer, endPos)) {
+        if (conn.buffer.size() > MAX_HEADER_SIZE)
             return sendError(BAD_REQUEST, conn);
         return;
     }
@@ -75,8 +75,8 @@ void Server::processHeaders(Connection& conn) {
     if (endPos > MAX_HEADER_SIZE)
         return sendError(BAD_REQUEST, conn);
 
-    conn.req.header.assign(conn.recvBuffer.data(), endPos); //TODO maybe remove this?
-    conn.recvBuffer.consume(endPos);
+    conn.req.header.assign(conn.buffer.data(), endPos);
+    conn.buffer.consume(endPos);
 
     parser_.parse(conn.req.header);
     conn.req = parser_.getRequest();
