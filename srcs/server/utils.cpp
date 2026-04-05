@@ -2,6 +2,7 @@
 #include <sys/stat.h>
 #include <iostream>
 #include <ctime>
+#include <cstdlib>
 #include "webserv.h"
 
 std::string getTime() {
@@ -11,6 +12,20 @@ std::string getTime() {
 
     std::strftime(buffer, sizeof(buffer), "%H:%M:%S", t);
     return std::string(buffer);
+}
+
+std::string generateRandomName(const std::string& prefix) {
+    static const char charset[] =
+        "0123456789"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz";
+    std::string name = prefix;
+    
+    // Seed once if needed, or rely on main() seeding srand()
+    for (int i = 0; i < 10; ++i) {
+        name += charset[rand() % (sizeof(charset) - 1)];
+    }
+    return name;
 }
 
 void log(int type, const std::string& msg) {

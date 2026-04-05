@@ -1,3 +1,5 @@
+#include <fcntl.h>
+#include <unistd.h>
 #include "ConfigParser.h"
 #include "defines.h"
 #include "webserv.h"
@@ -136,13 +138,14 @@ void Server::processBody(Connection& conn) {
 }
 
 int openTempFile(std::string& path) {
-    char tmpl[] = "/tmp/webserver_XXXXXX";
-
-    int fd = mkstemp(tmpl);
-    if (fd == -1)
-        return -1;
-
-    path = tmpl;
-
+    int fd = -1;
+    
+    for (int i = 0; i < 10; ++i) {
+        path = generateRandomName("/tmp/webserver_");
+        fd = open(path.c_str(), O_RDWR | O_CREAT | O_EXCL, 0600);
+        if (fd != -1)
+            break;
+    }
+    
     return fd;
 }

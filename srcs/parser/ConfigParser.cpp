@@ -3,6 +3,8 @@
 #include <cctype>
 #include <stdexcept>
 #include <iostream>
+#include <sys/stat.h>
+#include <cstdlib>
 
 /* Location Config */
 LocationConfig::LocationConfig() :
@@ -90,8 +92,18 @@ void ConfigParser::tokenize(const std::string& filename) {
 
 	_tokens.clear();
 	if (!file.is_open()) {
-		throw std::runtime_error("Cannot open config file");
+		throw std::runtime_error("Cannot open config file: " + filename);
 	}
+
+	struct stat st;
+	if (stat(filename.c_str(), &st) != 0) {
+		throw std::runtime_error("Cannot stat config file: " + filename);
+	}
+
+	if (!S_ISREG(st.st_mode)) {
+		throw std::runtime_error("Config file is not a regular file: " + filename);
+	}
+
 	while (std::getline(file, line)) {
 		content += line;
 		content += '\n';

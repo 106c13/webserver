@@ -57,7 +57,7 @@ static int deleteResource(const std::string& path) {
     if (access(path.c_str(), W_OK) != 0)
         return FORBIDDEN;
 
-    if (remove(path.c_str()) != 0)
+    if (unlink(path.c_str()) != 0)
         return SERVER_ERROR;
 
     return NO_CONTENT;

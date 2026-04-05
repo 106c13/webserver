@@ -142,6 +142,7 @@ class	Server {
 
 int						resolvePath(std::string& path, LocationConfig& location);
 void					log(int type, const std::string& msg);
+std::string				generateRandomName(const std::string& prefix);
 LocationConfig&			resolveLocation(std::string& fs_path, LocationList& locations);
 ssize_t					getFileSize(const std::string& path);
 std::vector<DirEntry>	listDirectory(const std::string& path);

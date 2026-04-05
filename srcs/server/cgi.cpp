@@ -75,8 +75,8 @@ static char** createEnvironment(const Request& req, int port) {
 }
 
 void Server::runCGI(const char* cgiPath, Connection& conn) {
-    char tmpl[] = "/tmp/webserver_cgiXXXXXX";
-    int tmpFd = mkstemp(tmpl);
+    std::string tmpl;
+    int tmpFd = openTempFile(tmpl);
     if (tmpFd == -1)
         return log(ERROR, "Failed to create tmp file");
     close(tmpFd);
@@ -86,7 +86,7 @@ void Server::runCGI(const char* cgiPath, Connection& conn) {
         return log(ERROR, "Fork failed");
 
     if (pid == 0) {
-        int outFd = open(tmpl, O_WRONLY | O_TRUNC);
+        int outFd = open(tmpl.c_str(), O_WRONLY | O_TRUNC);
         if (outFd == -1)
             _exit(1);
 
