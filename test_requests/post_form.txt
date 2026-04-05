@@ -1,0 +1,7 @@
+POST /login HTTP/1.1
+Host: localhost:8080
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 29
+Connection: close
+
+username=admin&password=12345

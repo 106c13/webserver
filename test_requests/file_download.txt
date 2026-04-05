@@ -1,0 +1,8 @@
+HTTP/1.1 200 OK
+Content-Type: application/octet-stream
+Content-Length: 12345
+Content-Disposition: attachment; filename="example.txt"
+Connection: close
+
+<file binary content here>
+

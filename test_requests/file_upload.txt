@@ -1,0 +1,13 @@
+POST /upload HTTP/1.1
+Host: localhost:8080
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryXyZ123
+Content-Length: 173
+Connection: close
+
+------WebKitFormBoundaryXyZ123
+Content-Disposition: form-data; name="file"; filename="hello.txt"
+Content-Type: text/plain
+
+Hello world!
+This is my file.
+------WebKitFormBoundaryXyZ123--

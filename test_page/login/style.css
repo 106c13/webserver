@@ -1,0 +1,165 @@
+/* =========================
+   RESET
+========================= */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* =========================
+   GLOBAL
+========================= */
+
+body {
+    font-family: 'JetBrains Mono', monospace;
+    background-color: #211F1F;
+    color: #DED8D7;
+}
+
+/* =========================
+   BACKGROUND SYSTEM
+========================= */
+
+.page-background {
+    min-height: 100vh;
+    background: url("https://images.pexels.com/photos/355747/pexels-photo-355747.jpeg") no-repeat center center fixed;
+    background-size: cover;
+    display: flex;
+    align-items: center;
+    position: relative;
+}
+
+/* Dark overlay */
+
+.page-background::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(33, 31, 31, 0.80);
+}
+
+/* =========================
+   FORM CONTAINER
+========================= */
+
+.auth-left,
+.login-form {
+    position: relative;
+    z-index: 1;
+    width: 400px;
+    margin-left: 10%;
+}
+
+h1 {
+    font-size: 48px;
+    color: #F54320;
+    margin-bottom: 30px;
+}
+
+/* =========================
+   INPUTS
+========================= */
+
+input {
+    width: 100%;
+    padding: 14px;
+    margin-bottom: 15px;
+    background: transparent;
+    border: 1px solid #F54320;
+    color: #DED8D7;
+    font-family: inherit;
+}
+
+input:focus {
+    outline: none;
+    border-color: #DED8D7;
+}
+
+/* =========================
+   PRIMARY BUTTON
+========================= */
+
+.primary-btn,
+button[type="submit"] {
+    width: 100%;
+    padding: 14px;
+    background-color: #F54320;
+    border: none;
+    color: #211F1F;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.primary-btn:hover,
+button[type="submit"]:hover {
+    background-color: #DED8D7;
+}
+
+/* =========================
+   LINKS
+========================= */
+
+.login-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.secondary-link {
+    color: #F54320;
+    text-decoration: none;
+    font-weight: bold;
+    position: relative;
+    transition: 0.3s;
+}
+
+/* Underline animation */
+
+.secondary-link::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -4px;
+    width: 0%;
+    height: 2px;
+    background-color: #F54320;
+    transition: width 0.3s ease;
+}
+
+.secondary-link:hover {
+    color: #DED8D7;
+}
+
+.secondary-link:hover::after {
+    width: 100%;
+}
+
+/* =========================
+   ERROR MESSAGE
+========================= */
+
+.error {
+    color: #F54320;
+    margin-bottom: 15px;
+}
+
+/* =========================
+   ANIMATION
+========================= */
+
+.slide-in {
+    opacity: 0;
+    transform: translateX(-60px);
+    animation: slideIn 1s ease forwards;
+}
+
+@keyframes slideIn {
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
