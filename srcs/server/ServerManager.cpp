@@ -117,16 +117,22 @@ void ServerManager::processHeaders(Connection& conn) {
 
     log(INFO, conn.req.version + " " + conn.req.method + " " + conn.req.uri + " (Port: " + toString(conn.port) + ")");
 
-    bool checkMethod = true;
+    bool cM = true;
     std::string cgiPath = findCGI(conn.req.path, conn.config->cgi.extensions);
-    if (cgiPath.empty()) {
-        if (isMethodAllowed(conn.req.method, conn.config->cgi.methods))
-            checkMethod = false;
+    if (!cgiPath.empty()) {
+        if (isMethodAllowed(conn.req.method, conn.config->cgi.methods)) {
+            cM = false;
+            conn.req.cgiPath = cgiPath;
+        }
+    } else {
+        cgiPath = findCGI(conn.req.path, conn.config->cgi.extensions);
+        if (!cgiPath.empty())
+            conn.req.cgiPath = cgiPath;
     }
 
     int status;
 
-    if (checkMethod) {
+    if (cM) {
         status = checkMethod(conn.req, conn.location);
         if (status != OK)
             return sendError(status, conn);
@@ -137,7 +143,7 @@ void ServerManager::processHeaders(Connection& conn) {
     if (status == DIRECTORY_NO_INDEX && conn.location.autoindex)
         return generateAutoindex(conn);
 
-    if (status != OK && cgiPath.empty() && !conn.location.root.empty())
+    if (status != OK && conn.req.cgiPath.empty() && !conn.location.root.empty())
         return sendError(status, conn);
     
     if (conn.location.redirectCode != 0)

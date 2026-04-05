@@ -125,11 +125,8 @@ void ServerManager::handlePost(Connection& conn) {
     if (location.root.empty())
         return sendError(OK, conn);
 
-    std::string cgiPath = findCGI(req.path, conn.config->cgi);
-    if (cgiPath.empty())
-        cgiPath = findCGI(req.path, location.cgi);
-    if (!cgiPath.empty())
-        return runCGI(cgiPath.c_str(), conn);
+    if (!req.cgiPath.empty())
+        return runCGI(req.cgiPath.c_str(), conn);
 
     handleMultipart(conn);
 
@@ -150,12 +147,8 @@ void ServerManager::handleGet(Connection& conn) {
 
     res.path = req.path;
 
-    std::string cgiPath = findCGI(req.path, conn.config->cgi);
-    if (cgiPath.empty())
-        cgiPath = findCGI(req.path, location.cgi);
-        
-    if (!cgiPath.empty())
-        return runCGI(cgiPath.c_str(), conn);
+    if (!req.cgiPath.empty())
+        return runCGI(req.cgiPath.c_str(), conn);
 
     if (!prepareFileResponse(conn, req.path))
         return sendError(SERVER_ERROR, conn);

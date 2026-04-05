@@ -65,6 +65,7 @@ struct Request {
 	std::vector<SetCookie>				setCookies;
 	std::vector<MultipartPart>			multipartParts;
 	std::string							boundary;
+	std::string							cgiPath;
 	Request();
 };
 

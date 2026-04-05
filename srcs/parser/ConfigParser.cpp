@@ -400,8 +400,8 @@ void ConfigParser::print() const {
 		}
 
 		std::cout << "  Server-level CGI:" << std::endl;
-		for (std::map<std::string, std::string>::const_iterator it = server.cgi.begin();
-			 it != server.cgi.end(); ++it) {
+		for (std::map<std::string, std::string>::const_iterator it = server.cgi.extensions.begin();
+			 it != server.cgi.extensions.end(); ++it) {
 			std::cout << "    " << it->first << " -> " << it->second << std::endl;
 		}
 
