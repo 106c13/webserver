@@ -216,6 +216,7 @@ void ConfigParser::parseServer() {
 					std::string handler = current().value;
 					expect(TOK_WORD, "Expected CGI handler path");
 
+					std::cout << "PARSER: " << handler << std::endl;
 					server.cgi.extensions[extension] = handler;
 
 					expect(TOK_SEMICOLON, "Expected ';' after cgi entry");

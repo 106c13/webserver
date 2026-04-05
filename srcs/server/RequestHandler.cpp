@@ -142,6 +142,7 @@ void ServerManager::handleGet(Connection& conn) {
     Response& res = conn.res;
     LocationConfig& location = conn.location;
 
+	conn.state = PROCESSING;
     if (location.root.empty())
         return sendError(OK, conn);
 
