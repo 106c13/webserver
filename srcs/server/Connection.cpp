@@ -13,9 +13,12 @@ void ServerManager::checkTimeOuts() {
         size_t diff = std::time(NULL) - conn.lastActivityTime;
 
         if ((conn.state == READING_HEADER && diff > HEADER_TIMEOUT) ||
-            ((conn.state == READING_BODY) && diff > BODY_TIMEOUT))
+            (conn.state == READING_BODY && diff > BODY_TIMEOUT) ||
+            (conn.state == SENDING_RESPONSE && diff > BODY_TIMEOUT))
         {
             sendError(REQUEST_TIMEOUT, conn);
+			conn.state = CLOSED;
+			handleWrite(conn);
             int fd = it->first;
             ++it;
             closeConnection(fd);

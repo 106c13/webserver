@@ -172,7 +172,7 @@ void ServerManager::sendError(int code, Connection& conn) {
     std::string header = generateHeader(res);
     conn.buffer.append(header);
     conn.buffer.append(page, pageSize);
-	conn.state = SENDING_RESPONSE;
+	conn.state = FINISHED;
 
     modifyToWrite(conn.fd);
 }

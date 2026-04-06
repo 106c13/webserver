@@ -54,6 +54,6 @@ bool ServerManager::streamFileChunk(Connection& conn) {
 
     close(conn.fileBuffer);
     conn.fileBuffer = -1;
-    conn.state = SENDING_RESPONSE;
+    conn.state = FINISHED;
     return false;
 }

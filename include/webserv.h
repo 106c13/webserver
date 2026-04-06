@@ -52,6 +52,7 @@ enum ConnState {
     SENDING_RESPONSE = 44,
     TIMEOUT = 43,
     CLOSED = 42,
+	FINISHED = 41
 };
 
 struct Connection {

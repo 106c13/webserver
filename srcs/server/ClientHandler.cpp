@@ -32,6 +32,9 @@ void ServerManager::handleWrite(Connection& conn) {
         streamFileChunk(conn);
     }
 
+	if (conn.state == FINISHED && conn.buffer.empty())
+		conn.state = CLOSED;
+
     if (conn.buffer.empty()) {
         modifyToRead(conn.fd);
     }
@@ -56,7 +59,7 @@ void ServerManager::handleClient(Event& event) {
     if (conn.state == CLOSED)
         return closeConnection(conn.fd);
 
-    if ((conn.state == SENDING_FILE || conn.state == SENDING_RESPONSE) && IS_EVENT_WRITE(event))
+    if ((conn.state == SENDING_FILE || conn.state == SENDING_RESPONSE || conn.state == FINISHED) && IS_EVENT_WRITE(event))
         handleWrite(conn);
 
     if (conn.state == CLOSED)
