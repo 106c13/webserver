@@ -66,7 +66,7 @@ void ServerManager::processFixedBody(Connection& conn) {
     size_t toWrite = std::min(remaining, available);
 
     ssize_t n = write(req.fileBuffer, buf.data(), toWrite);
-    if (n <= 0)
+    if (n < 0)
         return sendError(SERVER_ERROR, conn);
 
     req.bodyReceived += n;

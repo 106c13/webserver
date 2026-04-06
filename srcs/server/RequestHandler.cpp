@@ -47,26 +47,25 @@ static bool handleMultipart(Connection& conn) {
         while ((pos = buffer.find(boundary)) != std::string::npos) {
 
             if (in_file && out_fd != -1 && pos > 0) {
-                write(out_fd, buffer.data(), pos);
+				if (buffer[pos - 1] == '\n' && buffer[pos - 2] == '\r')
+					pos -= 2;
+				if (pos > 0)
+                	write(out_fd, buffer.data(), pos);
             }
 
             buffer.erase(0, pos + boundary.size());
 
-            // end of multipart
             if (buffer.compare(0, 2, "--") == 0)
                 break;
 
-            // skip CRLF
             if (buffer.compare(0, 2, "\r\n") == 0)
                 buffer.erase(0, 2);
 
-            // close previous file
             if (out_fd != -1) {
                 close(out_fd);
                 out_fd = -1;
             }
 
-            // parse headers
             size_t header_end;
             while ((header_end = buffer.find("\r\n\r\n")) == std::string::npos) {
                 n = read(fd, buf, BUFFER_SIZE);
@@ -96,7 +95,6 @@ static bool handleMultipart(Connection& conn) {
             }
         }
 
-        // write safe chunk (avoid cutting boundary)
         if (in_file && out_fd != -1) {
             if (buffer.size() > boundary.size()) {
                 size_t safe = buffer.size() - boundary.size();
