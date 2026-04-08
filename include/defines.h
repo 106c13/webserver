@@ -9,6 +9,7 @@ typedef std::map<std::string, std::string> StringMap;
 #define COLOR_GREEN "\033[1;32m"
 #define COLOR_RED "\033[1;31m"
 #define COLOR_YELLOW "\033[1;33m"
+#define COLOR_BLUE "\033[1;34m"
 #define COLOR_RESET "\033[0m"
 
 #define MAX_HEADER_SIZE 8000
@@ -16,13 +17,15 @@ typedef std::map<std::string, std::string> StringMap;
 #define MAX_CHUNK_SIZE_LEN 16
 #define HEADER_TIMEOUT 10
 #define BODY_TIMEOUT 5
+#define CGI_TIMEOUT 10
 
 #define BUFFER_SIZE 1024 
 
 enum Log {
-	INFO = 10,
-	WARNING = 11,
-	ERROR = 12
+	INFO,
+	WARNING,
+	ERROR,
+	DEBUG
 };
 
 
@@ -40,6 +43,7 @@ enum Page {
 	PAYLOAD_TOO_LARGE = 413,
 	SERVER_ERROR = 500,
 	SERVICE_UNAVAILABLE = 503,
+	GETWAY_TIMEOUT = 504,
 	DIRECTORY_NO_INDEX = 1000
 };
 

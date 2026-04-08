@@ -34,10 +34,10 @@ void log(int type, const std::string& msg) {
 
     if (type == INFO) {
         std::cout << "[" << time << "] "
-                  << COLOR_GREEN
+                  << COLOR_BLUE
                   << "[INFO] "
-                  << COLOR_RESET
                   << msg
+                  << COLOR_RESET
                   << "\n";
 
     } else if (type == ERROR) {
@@ -55,7 +55,14 @@ void log(int type, const std::string& msg) {
                   << msg
                   << COLOR_RESET
                   << "\n";
-    }
+    } else if (type == DEBUG) {
+        std::cout << "[" << time << "] "
+                  << COLOR_GREEN
+                  << "[DEBUG] "
+                  << msg
+                  << COLOR_RESET
+                  << "\n";
+	}
 }
 
 ssize_t getFileSize(const std::string& path) {

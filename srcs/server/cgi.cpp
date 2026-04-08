@@ -112,6 +112,7 @@ void ServerManager::runCGI(const char* cgiPath, Connection& conn) {
     }
 
     cgiProcesses_.push_back(CGIProcess(pid, tmpl, &conn));
+	conn.tmpFilePath = tmpl;
 }
 
 std::string findCGI(const std::string& fileName, const StringMap& cgiMap) {

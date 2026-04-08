@@ -74,6 +74,8 @@ void ServerManager::closeConnection(int fd) {
             close(conn.fileBuffer);
         if (!conn.req.tempFilePath.empty())
             unlink(conn.req.tempFilePath.c_str());
+		if (!conn.tmpFilePath.empty())
+            unlink(conn.tmpFilePath.c_str());
     }
     close(fd);
     connections_.erase(fd);

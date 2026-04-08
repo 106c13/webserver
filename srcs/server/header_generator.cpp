@@ -3,32 +3,35 @@
 #include "defines.h"
 #include <map>
 
-static std::string getStatus(int code) {
-    if (code == OK) {
-        return "200 OK";
-    } else if (code == NO_CONTENT) {
-        return "204 No Content";
-    } else if (code == REDIRECT) {
-        return "301 Moved Permanently";
-    } else if (code == TEMPRORARY_REDIRECT) {
-        return "302 Temporary Redirect";
-    } else if (code == BAD_REQUEST) {
-        return "400 Bad Request";
-    } else if (code == FORBIDDEN) {
-        return "403 Forbidden";
-    } else if (code == NOT_FOUND) {
-        return "404 Not Found";
-    } else if (code == METHOD_NOT_ALLOWED) {
-        return "405 Method Not Allowed";
-    } else if (code == REQUEST_TIMEOUT) {
-        return "408 Request Timeout";
-    } else if (code == LENGTH_REQUIRED) {
-        return "411 Length Required";
-    } else if (code == PAYLOAD_TOO_LARGE) {
-        return "413 Content Too Large";
-    } else if (code == SERVICE_UNAVAILABLE) {
-        return "503 Service Unavailable";
+static const char* getStatus(int code) {
+    static std::map<int, const char*> statusMap;
+
+    if (statusMap.empty()) {
+        statusMap[200] = "200 OK";
+        statusMap[204] = "204 No Content";
+        statusMap[301] = "301 Moved Permanently";
+        statusMap[302] = "302 Found";
+        statusMap[307] = "307 Temporary Redirect";
+
+        statusMap[400] = "400 Bad Request";
+        statusMap[403] = "403 Forbidden";
+        statusMap[404] = "404 Not Found";
+        statusMap[405] = "405 Method Not Allowed";
+        statusMap[408] = "408 Request Timeout";
+        statusMap[411] = "411 Length Required";
+        statusMap[413] = "413 Content Too Large";
+
+        statusMap[500] = "500 Internal Server Error";
+        statusMap[501] = "501 Not Implemented";
+        statusMap[502] = "502 Bad Gateway";
+        statusMap[503] = "503 Service Unavailable";
+        statusMap[504] = "504 Gateway Timeout";
     }
+
+    std::map<int, const char*>::iterator it = statusMap.find(code);
+    if (it != statusMap.end())
+        return it->second;
+
     return "500 Internal Server Error";
 }
 

@@ -17,6 +17,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <ctime>
 #include "ConfigParser.h"
 #include "RequestParser.h"
 #include "HeaderGenerator.h"
@@ -72,17 +73,19 @@ struct Connection {
 
 	size_t			chunkSize;
 	bool			hasChunkSize;
+	std::string		tmpFilePath;
     
-    Connection() : fd(-1), port(-1), state(READING_HEADER), fileBuffer(-1), config(NULL), lastActivityTime(0), chunkSize(0), hasChunkSize(false) {}
+    Connection() : fd(-1), port(-1), state(READING_HEADER), fileBuffer(-1), config(NULL), lastActivityTime(std::time(NULL)), chunkSize(0), hasChunkSize(false) {}
 };
 
 struct CGIProcess {
-    pid_t pid;
-    std::string tmpFilePath;
-    Connection* conn;
+    pid_t		pid;
+    std::string	tmpFilePath;
+    Connection*	conn;
+	time_t		startTime;
 
     CGIProcess(pid_t p, const std::string& path, Connection* c)
-        : pid(p), tmpFilePath(path), conn(c) {}
+        : pid(p), tmpFilePath(path), conn(c), startTime(std::time(NULL)) {}
 };
 
 struct DirEntry {

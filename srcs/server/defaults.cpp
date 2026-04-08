@@ -123,6 +123,22 @@ static const char* generateDefaultPage(int code, size_t* pageSize) {
 "    <p>WebServ 42</p>\n"
 "</body>\n"
 "</html>";
+	} else if (code == GETWAY_TIMEOUT) {
+		*pageSize = 272;
+		return
+"<!DOCTYPE html>\n"
+"<html>\n"
+"<head>\n"
+"    <meta charset=\"UTF-8\">\n"
+"    <title>504 Gateway Timeout</title>\n"
+"</head>\n"
+"<body>\n"
+"    <h1>504 Gateway Timeout</h1>\n"
+"    <p>The server did not receive a timely response from the upstream server.</p>\n"
+"    <hr>\n"
+"    <p>WebServ 42</p>\n"
+"</body>\n"
+"</html>";
 	}
 	*pageSize = 0;
 	return "";
@@ -139,8 +155,6 @@ void ServerManager::sendError(int code, Connection& conn) {
     res.status = code;
     res.contentType = "text/html";
 
-    // If config is not yet determined (e.g. error during initial header reading),
-    // find the default config for this port.
     if (!conn.config) {
         conn.config = findServerConfig(conn.port, "");
     }
