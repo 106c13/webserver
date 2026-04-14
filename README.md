@@ -27,11 +27,14 @@ This project emphasizes low-level programming concepts including **sockets**, **
 
 ```bash
 make
+```
 
 ---
 
+```
 ### 🔧 Execution
 ./webserv [config file]
+```
 
 ## 📚 Resources
 
