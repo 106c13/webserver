@@ -31,8 +31,8 @@ make
 
 ---
 
-```
 ### 🔧 Execution
+```
 ./webserv [config file]
 ```
 
