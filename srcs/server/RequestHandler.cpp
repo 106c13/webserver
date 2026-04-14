@@ -146,8 +146,10 @@ void ServerManager::handleGet(Connection& conn) {
 
     res.path = req.path;
 
-    if (!req.cgiPath.empty())
-        return runCGI(req.cgiPath.c_str(), conn);
+    if (!req.cgiPath.empty()) {
+		runCGI(req.cgiPath.c_str(), conn);
+    	return modifyToWrite(conn.fd);
+	}
 
     if (!prepareFileResponse(conn, req.path))
         return sendError(SERVER_ERROR, conn);

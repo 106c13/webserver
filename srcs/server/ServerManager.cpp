@@ -149,12 +149,11 @@ void ServerManager::processHeaders(Connection& conn) {
 		return sendRedirect(conn);
 
 	if (conn.req.method == "GET")
-		return handleGet(conn);
-
-	if (conn.req.method == "DELETE")
+		handleGet(conn);
+	else if (conn.req.method == "DELETE")
 		return sendError(deleteResource(conn.req.path), conn);
-
-	return startBodyReading(conn);
+	else if (conn.req.method == "POST")
+		return startBodyReading(conn);
 }
 
 void ServerManager::acceptConnection(int serverFd) {
@@ -252,10 +251,11 @@ void ServerManager::checkCGIProcesses() {
 
 	while (it != cgiProcesses_.end()) {
 		int status;
+
 		pid_t result = waitpid(it->pid, &status, WNOHANG);
 
         if (now - it->startTime > CGI_TIMEOUT) {
-            log(DEBUG, "CGI timeout, killing pid " + toString(it->pid));
+            log(ERROR, "CGI timeout, killing pid " + toString(it->pid));
 
             kill(it->pid, SIGKILL);
             waitpid(it->pid, NULL, 0);
@@ -277,7 +277,7 @@ void ServerManager::checkCGIProcesses() {
 		    } else if (WIFSIGNALED(status)) {
 				int sig = WTERMSIG(status);
 				
-				log(DEBUG, "CGI killed by signal: " + toString(sig));
+				log(ERROR, "CGI killed by signal: " + toString(sig));
 				sendError(SERVER_ERROR, *(it->conn));
 		    }
 			
@@ -299,16 +299,18 @@ void ServerManager::run() {
 	timeout.tv_nsec = 0;
 #endif
 
-	int req = 0;
-	while (req < 100) {
+	while (true) {
 #ifdef __linux__
 		int evCount = epoll_wait(epollFd_, events, 1024, 1000);
 #elif __APPLE__
 		int evCount = kevent(epollFd_, NULL, 0, events, 1024, &timeout);
 #endif
 
+
 		checkTimeOuts();
-		checkCGIProcesses();
+		if (!cgiProcesses_.empty())
+			checkCGIProcesses();
+
 		if (evCount < 0)
 		    continue;
 
@@ -322,7 +324,6 @@ void ServerManager::run() {
 
 		    if (listeningSockets_.count(fd)) {
 		        acceptConnection(fd);
-				req++;
 		    } else {
 		        try {
 		            handleClient(events[i]);
@@ -343,7 +344,6 @@ ServerManager::ServerManager(const Config& config) : fullConfig_(config) {
 	if (epollFd_ < 0)
 		throw std::runtime_error("Failed to create multiplexing instance");
 
-	// Group configs by port
 	for (size_t i = 0; i < config.servers.size(); ++i) {
 		ports_[config.servers[i].port].push_back(config.servers[i]);
 	}

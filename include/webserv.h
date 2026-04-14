@@ -99,12 +99,12 @@ class	ServerManager {
 	private:
 		// config
 		Config                      fullConfig_;
-		std::map<int, std::vector<ServerConfig> > ports_; // port -> list of configs
+		std::map<int, std::vector<ServerConfig> > ports_;
 
 		// variables
 		std::map<int, Connection>	connections_;
 		std::vector<CGIProcess>		cgiProcesses_;
-		std::map<int, int>          listeningSockets_; // fd -> port
+		std::map<int, int>          listeningSockets_;
 		int							epollFd_;
 
 		void			initSockets();

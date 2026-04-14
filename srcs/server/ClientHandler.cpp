@@ -21,6 +21,7 @@ void ServerManager::handleWrite(Connection& conn) {
                      conn.buffer.data(),
                      conn.buffer.size(),
                      0);
+
     if (n > 0) {
         conn.buffer.consume(n);
     } else if (n <= 0) {

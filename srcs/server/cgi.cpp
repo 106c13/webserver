@@ -110,7 +110,6 @@ void ServerManager::runCGI(const char* cgiPath, Connection& conn) {
         execve(cgiPath, argv, env);
         _exit(1);
     }
-
     cgiProcesses_.push_back(CGIProcess(pid, tmpl, &conn));
 	conn.tmpFilePath = tmpl;
 }
@@ -195,12 +194,8 @@ void ServerManager::handleCGIRead(Connection& conn, const std::string& tmpFilePa
 
     conn.buffer.clear();
 
-    if (pos == std::string::npos) {
-        conn.res.contentLength = "0";
-        conn.buffer.append(generateHeader(conn.res));
-        modifyToWrite(conn.fd);
-        return;
-    }
+    if (pos == std::string::npos)
+		return sendError(SERVER_ERROR, conn);
 
     headers = raw.substr(0, pos);
     parseCGIHeaders(conn.res, headers);
