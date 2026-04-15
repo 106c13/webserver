@@ -21,7 +21,6 @@ std::string generateRandomName(const std::string& prefix) {
         "abcdefghijklmnopqrstuvwxyz";
     std::string name = prefix;
     
-    // Seed once if needed, or rely on main() seeding srand()
     for (int i = 0; i < 10; ++i) {
         name += charset[rand() % (sizeof(charset) - 1)];
     }

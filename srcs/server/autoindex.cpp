@@ -75,7 +75,7 @@ void ServerManager::generateAutoindex(Connection& conn) {
     res.connectionType = "close";
 
     conn.buffer.clear();
-    conn.buffer.append(generateHeader(res));
+    conn.buffer.append(generateHeader(res, toString(conn.port)));
     conn.buffer.append(page);
     conn.state = SENDING_RESPONSE;
     modifyToWrite(conn.fd);

@@ -27,18 +27,16 @@ void ServerManager::handleWrite(Connection& conn) {
     } else if (n <= 0) {
         conn.state = CLOSED;
         return;
-    }
-
-    if (conn.state == SENDING_FILE) {
-        streamFileChunk(conn);
-    }
-
+	}
+	
+	if (conn.state == SENDING_FILE)
+		streamFileChunk(conn);
+	
 	if (conn.state == FINISHED && conn.buffer.empty())
 		conn.state = CLOSED;
 
-    if (conn.buffer.empty()) {
+    if (conn.buffer.empty())
         modifyToRead(conn.fd);
-    }
 }
 
 void ServerManager::handleClient(Event& event) {

@@ -104,6 +104,10 @@ void ConfigParser::tokenize(const std::string& filename) {
 		throw std::runtime_error("Config file is not a regular file: " + filename);
 	}
 
+	if (st.st_size == 0) {
+    	throw std::runtime_error("Config file is empty: " + filename);
+	}
+
 	while (std::getline(file, line)) {
 		content += line;
 		content += '\n';

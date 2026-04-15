@@ -4,7 +4,7 @@
 #include "ConfigParser.h"
 
 static void flushHeader(Connection& conn) {
-    std::string header = generateHeader(conn.res);
+    std::string header = generateHeader(conn.res, toString(conn.port));
     conn.buffer.append(header);
 }
 

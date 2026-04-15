@@ -34,9 +34,8 @@ int resolvePath(std::string& path, LocationConfig& location) {
                 return FORBIDDEN;
             }
 
-            if (!S_ISREG(st.st_mode)) {
+            if (!S_ISREG(st.st_mode))
                 continue;
-            }
 
             path = tmp;
             return OK;
@@ -44,13 +43,11 @@ int resolvePath(std::string& path, LocationConfig& location) {
         return DIRECTORY_NO_INDEX;
     }
 
-    if (!S_ISREG(st.st_mode)) {
+    if (!S_ISREG(st.st_mode))
         return NOT_FOUND;
-    }
     
-    if (access(path.c_str(), R_OK | W_OK) != 0) {
+    if (access(path.c_str(), R_OK | W_OK) != 0)
         return FORBIDDEN;
-    }
 
     return OK;
 }
@@ -78,9 +75,9 @@ LocationConfig& resolveLocation(std::string& fs_path, LocationList& locations) {
     }
 
     if (!best) {
-		if (locations.empty()) {
+		if (locations.empty())
 			throw std::runtime_error("No locations configured");
-        }
+
 		best = &locations.front();
 	}
 

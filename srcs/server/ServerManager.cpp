@@ -163,9 +163,8 @@ void ServerManager::acceptConnection(int serverFd) {
 
 	while (true) {
 		int clientFd = accept(serverFd, (sockaddr*)&addr, &len);
-		if (clientFd < 0) {
+		if (clientFd < 0)
 			return;
-		}
 
 		fcntl(clientFd, F_SETFL, O_NONBLOCK);
 
@@ -198,14 +197,12 @@ void ServerManager::initSockets() {
 		int port = it->first;
 		int serverFd = socket(AF_INET, SOCK_STREAM, 0);
 
-		if (serverFd < 0) {
+		if (serverFd < 0)
 		    throw std::runtime_error("socket() failed");
-		}
 
 		int opt = 1;
-		if (setsockopt(serverFd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+		if (setsockopt(serverFd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
 		    throw std::runtime_error("setsockopt() failed");
-		}
 
 		sockaddr_in addr;
 		memset(&addr, 0, sizeof(addr));

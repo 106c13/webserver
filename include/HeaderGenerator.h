@@ -30,6 +30,6 @@ struct Response {
     {}
 };
 
-std::string	generateHeader(const struct Response& res);
+std::string	generateHeader(const struct Response& res, std::string port);
 
 #endif

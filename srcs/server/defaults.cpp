@@ -180,7 +180,7 @@ void ServerManager::sendError(int code, Connection& conn) {
 
     page = generateDefaultPage(code, &pageSize);	
     res.contentLength = toString(pageSize);
-    std::string header = generateHeader(res);
+    std::string header = generateHeader(res, toString(conn.port));
     conn.buffer.append(header);
     conn.buffer.append(page, pageSize);
 	conn.state = FINISHED;

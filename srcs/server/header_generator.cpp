@@ -107,13 +107,13 @@ static std::string resolveContentType(const std::string& ext) {
     }
 
     std::map<std::string, std::string>::const_iterator it = mimeTypes.find(ext);
-    if (it != mimeTypes.end()) {
+    if (it != mimeTypes.end())
         return it->second;
-    }
+
     return "application/octet-stream";
 }
 
-std::string generateHeader(const struct Response& res) {
+std::string generateHeader(const struct Response& res, std::string port) {
     std::string header;
     std::string contentType;
     std::string ext;
@@ -132,16 +132,14 @@ std::string generateHeader(const struct Response& res) {
         contentType = resolveContentType(ext);
     }
 
-    if (!res.location.empty()) {
+    if (!res.location.empty())
         header += "Location: " + res.location + "\r\n";
-    }
 
     header += "Content-Type: " + contentType + "\r\n";
     header += "Content-Length: " + res.contentLength + "\r\n";
 
-    if (!res.contentDisposition.empty()) {
+    if (!res.contentDisposition.empty())
         header += "Content-Disposition: " + res.contentDisposition + "\r\n";
-    }
 
     if (res.cookie) {
         header += "Set-Cookie: ";
@@ -151,6 +149,6 @@ std::string generateHeader(const struct Response& res) {
 
     header += "Connection: " + res.connectionType + "\r\n";
     header += "\r\n";
-    log(INFO, header.substr(0, header.find("\n")));
+    log(INFO, header.substr(0, header.find("\r")) + " (Port: " + port + ")");
 	return header;
 }

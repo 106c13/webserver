@@ -18,13 +18,11 @@ void ServerManager::addEvent(int fd, bool wantRead, bool wantWrite) {
     struct kevent ev[2];
     int n = 0;
 
-    if (wantRead) {
+    if (wantRead)
         EV_SET(&ev[n++], fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
-    }
 
-    if (wantWrite) {
+    if (wantWrite)
         EV_SET(&ev[n++], fd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
-    }
 
     kevent(epollFd_, ev, n, NULL, 0, NULL);
 #endif

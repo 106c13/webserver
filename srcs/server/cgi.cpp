@@ -129,9 +129,8 @@ std::string findCGI(const std::string& fileName, const StringMap& cgiMap) {
 
 	std::map<std::string, std::string>::const_iterator it = cgiMap.find(extension);
 
-	if (it == cgiMap.end()) {
+	if (it == cgiMap.end())
 		return "";
-    }
 
 	return it->second;
 }
@@ -205,7 +204,7 @@ void ServerManager::handleCGIRead(Connection& conn, const std::string& tmpFilePa
 
     conn.res.contentLength = toString(totalSize - bodyStart);
 
-    std::string responseHeader = generateHeader(conn.res);
+    std::string responseHeader = generateHeader(conn.res, toString(conn.port));
     conn.buffer.append(responseHeader);
     conn.buffer.append(remainder);
 
