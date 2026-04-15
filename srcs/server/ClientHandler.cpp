@@ -48,7 +48,6 @@ void ServerManager::handleClient(Event& event) {
 #elif __APPLE__
     fd = (int)event.ident;
 #endif
-
     if (connections_.find(fd) == connections_.end())
         return;
 

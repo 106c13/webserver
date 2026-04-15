@@ -155,9 +155,8 @@ void ServerManager::sendError(int code, Connection& conn) {
     res.status = code;
     res.contentType = "text/html";
 
-    if (!conn.config) {
+    if (!conn.config)
         conn.config = findServerConfig(conn.port, "");
-    }
 
     std::string path;
     std::map<int, std::string>::const_iterator it = conn.config->errorPages.find(code);
@@ -167,13 +166,11 @@ void ServerManager::sendError(int code, Connection& conn) {
 	}
 
     if (!path.empty()) {
-		if (path[0] != '/') {
+		if (path[0] != '/')
 			path = conn.config->root + '/' + path;
-		}
 		
-		if (prepareFileResponse(conn, path)) {
+		if (prepareFileResponse(conn, path))
 			return modifyToWrite(conn.fd);
-		}	
 
 		log(WARNING, "Error page " + path + " not found");
     }
