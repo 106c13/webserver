@@ -58,7 +58,7 @@ WEBSERV_TARGET ?= 127.0.0.1:8080
 
 test:
 	@$(CXX) $(CXXFLAGS) tests/test_config_parser.cpp $(SRCS_DIR)parser/ConfigParser.cpp -o test_config_parser
-	@$(CXX) $(CXXFLAGS) tests/test_request_parser.cpp $(SRCS_DIR)parser/RequestParser.cpp $(SRCS_DIR)server/header_generator.cpp -o test_request_parser
+	@$(CXX) $(CXXFLAGS) tests/test_request_parser.cpp $(SRCS_DIR)parser/RequestParser.cpp $(SRCS_DIR)server/header_generator.cpp $(SRCS_DIR)server/utils.cpp -o test_request_parser
 	@$(CXX) $(CXXFLAGS) testweb.cpp -o testweb
 	@./test_config_parser ; c=$$? ; echo "" ; \
 	 ./test_request_parser ; r=$$? ; echo "" ; \

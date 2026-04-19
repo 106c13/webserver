@@ -598,7 +598,7 @@ static void test_response_content_disposition(void) {
 	res.contentLength = "12345";
 	res.contentDisposition = "attachment; filename=\"report.pdf\"";
 
-	std::string headerStr = generateHeader(res);
+	std::string headerStr = generateHeader(res, "8080");
 
 	test_assert(headerStr.find("Content-Disposition: attachment; filename=\"report.pdf\"") != std::string::npos,
 		"response_disposition: header contains Content-Disposition");
@@ -615,7 +615,7 @@ static void test_response_no_disposition(void) {
 	res.contentType = "text/html";
 	res.contentLength = "100";
 
-	std::string headerStr = generateHeader(res);
+	std::string headerStr = generateHeader(res, "8080");
 
 	test_assert(headerStr.find("Content-Disposition") == std::string::npos,
 		"response_no_disposition: no Content-Disposition when empty");
@@ -629,7 +629,7 @@ static void test_response_inline_disposition(void) {
 	res.contentLength = "5000";
 	res.contentDisposition = "inline; filename=\"preview.pdf\"";
 
-	std::string headerStr = generateHeader(res);
+	std::string headerStr = generateHeader(res, "8080");
 
 	test_assert(headerStr.find("Content-Disposition: inline; filename=\"preview.pdf\"") != std::string::npos,
 		"response_inline: inline disposition works");

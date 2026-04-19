@@ -33,7 +33,7 @@ std::string toString(size_t n) {
 Target parseTarget(const std::string& input) {
     size_t pos = input.find(':');
     if (pos == std::string::npos) {
-        std::cerr << "❌ Invalid format. Use IP:PORT\n";
+        std::cerr << "Invalid format. Use IP:PORT\n";
         exit(1);
     }
 
@@ -276,10 +276,10 @@ bool checkStatus200(const std::string& response) {
 
 void printResult(const std::string& name, bool pass) {
     if (pass) {
-        std::cout << "✅ " << name << " → PASS" << std::endl;
+        std::cout << "[PASS] " << name << std::endl;
         g_passed++;
     } else {
-        std::cout << "❌ " << name << " → FAIL" << std::endl;
+        std::cout << "[FAIL] " << name << std::endl;
         g_failed++;
         g_failed_names.push_back(name);
     }
@@ -294,12 +294,12 @@ int main(int argc, char** argv) {
     Target t = parseTarget(argv[1]);
     Ports p = derivePorts(t.port);
 
-    std::cout << "🚀 Running Webserv Tests\n";
-    std::cout << "========================\n" << std::endl;
+    std::cout << "=== Webserv Integration Tests ===" << std::endl;
+    std::cout << std::endl;
 
     if (!canConnect(t.host, t.port)) {
-        std::cout << "⚠️  webserv not reachable at " << t.host << ":" << t.port
-                  << " — skipping integration tests" << std::endl;
+        std::cout << "[SKIP] webserv not reachable at " << t.host << ":" << t.port
+                  << std::endl;
         return 0;
     }
 
@@ -353,7 +353,7 @@ int main(int argc, char** argv) {
     // Autoindex: GET / on retro port → 200 + listing marker
     {
         if (!canConnect(t.host, p.retro)) {
-            std::cout << "⚠️  skipping autoindex test (port " << p.retro
+            std::cout << "[SKIP] autoindex test (port " << p.retro
                       << " not reachable)" << std::endl;
         } else {
             std::string res = doRequest(t.host, p.retro, buildGET(t.host));
@@ -409,7 +409,8 @@ int main(int argc, char** argv) {
         printResult("Keep-alive: two GETs on one socket", ok);
     }
 
-    std::cout << "\n✨ Done!" << std::endl;
+    std::cout << std::endl;
+    std::cout << "=== Results ===" << std::endl;
     std::cout << "Passed: " << g_passed << std::endl;
     std::cout << "Failed: " << g_failed << std::endl;
     if (g_failed > 0) {
