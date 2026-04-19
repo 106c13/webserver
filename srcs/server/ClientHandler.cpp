@@ -1,53 +1,71 @@
 #include <cerrno>
+#include <ctime>
 #include "webserv.h"
 #include "Buffer.h"
 
-void Server::handleRead(Connection& conn) {
-    char buf[BUFFER_SIZE];
+void ServerManager::handleRead(Connection& conn) {
+    conn.lastActivityTime = std::time(NULL);
 
-    while (true) {
-        ssize_t n = recv(conn.fd, buf, sizeof(buf), 0);
+    char buf[BUFFER_SIZE * 1000];
+    ssize_t n = recv(conn.fd, buf, sizeof(buf), 0);
 
-        if (n > 0)
-            conn.recvBuffer.append(buf, n);
-        else if (n == 0)
-            return closeConnection(conn.fd);
-        else
-            break;
-        break;
-    }
+    if (n > 0)
+        conn.buffer.append(buf, n);
+    else if (n == 0)
+        conn.state = CLOSED;
 }
 
-void Server::handleWrite(Connection& conn) {
-    std::cout << conn.sendBuffer.data() << std::endl;
+void ServerManager::handleWrite(Connection& conn) {
+    conn.lastActivityTime = std::time(NULL);
+    ssize_t n = send(conn.fd,
+                     conn.buffer.data(),
+                     conn.buffer.size(),
+                     0);
 
-    while (!conn.sendBuffer.empty()) {
-        ssize_t n = send(conn.fd,
-                         conn.sendBuffer.data(),
-                         conn.sendBuffer.size(),
-                         0);
-        if (n > 0) {
-            conn.sendBuffer.consume(n);
-        } else if (n == 0) {
-            return closeConnection(conn.fd);
-        } else {
-            break;
-        }
-    }
+    if (n > 0) {
+        conn.buffer.consume(n);
+    } else if (n <= 0) {
+        conn.state = CLOSED;
+        return;
+	}
+	
+	if (conn.state == SENDING_FILE)
+		streamFileChunk(conn);
+	
+	if (conn.state == FINISHED && conn.buffer.empty())
+		conn.state = CLOSED;
 
-    if (conn.state == SENDING_RESPONSE) {
-        if (conn.sendBuffer.empty() && !conn.sendingFile) {
-            conn.state = CLOSED;
-            return;
-        }
-    }
-    
-    if (conn.sendingFile) {
-        streamFileChunk(conn);
-    }
-
-    if (conn.sendBuffer.empty()) {
+    if (conn.buffer.empty())
         modifyToRead(conn.fd);
-    }
+}
 
+void ServerManager::handleClient(Event& event) {
+    int fd;
+#ifdef __linux__
+    fd = event.data.fd;
+#elif __APPLE__
+    fd = (int)event.ident;
+#endif
+    if (connections_.find(fd) == connections_.end())
+        return;
+
+    Connection& conn = connections_[fd];
+
+    if (IS_EVENT_READ(event))
+        handleRead(conn);
+
+    if (conn.state == CLOSED)
+        return closeConnection(conn.fd);
+
+    if ((conn.state == SENDING_FILE || conn.state == SENDING_RESPONSE || conn.state == FINISHED) && IS_EVENT_WRITE(event))
+        handleWrite(conn);
+
+    if (conn.state == CLOSED)
+        return closeConnection(conn.fd);
+
+    if (conn.state == READING_HEADER)
+        processHeaders(conn);
+
+    if (conn.state == READING_BODY)
+        processBody(conn);
 }

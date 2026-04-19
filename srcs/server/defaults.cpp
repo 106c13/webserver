@@ -10,9 +10,8 @@ std::string toString(size_t n) {
     return ss.str();
 }
 
-static const char* generateDefaultPage(int code, size_t* pageSize) {
+static std::string generateDefaultPage(int code) {
 	if (code == BAD_REQUEST) {
-		*pageSize = 228;
 		return 
 "<!DOCTYPE html>\n\
 <html>\n\
@@ -28,7 +27,6 @@ static const char* generateDefaultPage(int code, size_t* pageSize) {
 </body>\n\
 </html>";
 	} else if (code == NOT_FOUND) {
-		*pageSize = 224;
 		return
 "<!DOCTYPE html>\n\
 <html>\n\
@@ -44,7 +42,6 @@ static const char* generateDefaultPage(int code, size_t* pageSize) {
 </body>\n\
 </html>";
 	} else if (code == FORBIDDEN) {
-		*pageSize = 223;
 		return
 "<!DOCTYPE html>\n\
 <html>\n\
@@ -60,7 +57,6 @@ static const char* generateDefaultPage(int code, size_t* pageSize) {
 </body>\n\
 </html>";
 	} else if (code == METHOD_NOT_ALLOWED) {
-		*pageSize = 240;
 		return
 "<!DOCTYPE html>\n\
 <html>\n\
@@ -76,7 +72,6 @@ static const char* generateDefaultPage(int code, size_t* pageSize) {
 </body>\n\
 </html>";
 	} else if (code == PAYLOAD_TOO_LARGE) {
-		*pageSize = 260;
 		return
 "<!DOCTYPE html>\n\
 <html>\n\
@@ -92,7 +87,6 @@ static const char* generateDefaultPage(int code, size_t* pageSize) {
 </body>\n\
 </html>";
 	} else if (code == SERVER_ERROR) {
-		*pageSize = 297;
 		return
 "<!DOCTYPE html>\n\
 <html>\n\
@@ -108,7 +102,6 @@ static const char* generateDefaultPage(int code, size_t* pageSize) {
 </body>\n\
 </html>";
 	} else if (code == SERVICE_UNAVAILABLE) {
-		*pageSize = 307;
 		return 
 "<!DOCTYPE html>\n"
 "<html>\n"
@@ -123,15 +116,29 @@ static const char* generateDefaultPage(int code, size_t* pageSize) {
 "    <p>WebServ 42</p>\n"
 "</body>\n"
 "</html>";
+	} else if (code == GETWAY_TIMEOUT) {
+		return
+"<!DOCTYPE html>\n"
+"<html>\n"
+"<head>\n"
+"    <meta charset=\"UTF-8\">\n"
+"    <title>504 Gateway Timeout</title>\n"
+"</head>\n"
+"<body>\n"
+"    <h1>504 Gateway Timeout</h1>\n"
+"    <p>The server did not receive a timely response from the upstream server.</p>\n"
+"    <hr>\n"
+"    <p>WebServ 42</p>\n"
+"</body>\n"
+"</html>";
 	}
-	*pageSize = 0;
 	return "";
 }
 
-void Server::sendError(int code, Connection& conn) {
+void ServerManager::sendError(int code, Connection& conn) {
     Response& res = conn.res;
 
-	conn.sendBuffer.clear();
+	conn.buffer.clear();
 
 	if (code == DIRECTORY_NO_INDEX)
 		code = NOT_FOUND;
@@ -139,35 +146,34 @@ void Server::sendError(int code, Connection& conn) {
     res.status = code;
     res.contentType = "text/html";
 
-    std::string path;
-    std::map<int, std::string>::const_iterator it = config_.errorPages.find(code);
+    if (!conn.config)
+        conn.config = findServerConfig(conn.port, "");
 
-    if (it != config_.errorPages.end()) {
+    std::string path;
+    std::map<int, std::string>::const_iterator it = conn.config->errorPages.find(code);
+
+    if (it != conn.config->errorPages.end()) {
         path = it->second;
 	}
 
     if (!path.empty()) {
-		if (path[0] != '/') {
-			path = config_.root + '/' + path;
-		}
+		if (path[0] != '/')
+			path = conn.config->root + '/' + path;
 		
-		if (prepareFileResponse(conn, path)) {
+		if (prepareFileResponse(conn, path))
 			return modifyToWrite(conn.fd);
-		}	
 
 		log(WARNING, "Error page " + path + " not found");
     }
 
-    const char* page;
-    size_t pageSize;
+	std::string page;
 
-    page = generateDefaultPage(code, &pageSize);	
-    res.contentLength = toString(pageSize);
-    std::string header = generateHeader(res);
-
-    conn.sendBuffer.append(header);
-    conn.sendBuffer.append(page, pageSize);
-	conn.state = SENDING_RESPONSE;
+    page = generateDefaultPage(code);	
+    res.contentLength = toString(page.size());
+    std::string header = generateHeader(res, toString(conn.port));
+    conn.buffer.append(header);
+    conn.buffer.append(page.c_str(), page.size());
+	conn.state = FINISHED;
 
     modifyToWrite(conn.fd);
 }

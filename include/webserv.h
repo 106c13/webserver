@@ -2,20 +2,21 @@
 #define WEBSERV_H
 
 #include <iostream>
-#include <string>
 #include <sys/socket.h>
+#include <map>
+#include <vector>
+
 #ifdef __linux__
 #include <sys/epoll.h>
 #elif __APPLE__
 #include <sys/event.h>
 #include <sys/time.h>
 #endif
+
+#include <string>
 #include <netinet/in.h>
 #include <unistd.h>
-#include <exception>
 #include <dirent.h>
-#include <cstddef>
-#include <cstring> 
 #include <ctime>
 #include "ConfigParser.h"
 #include "RequestParser.h"
@@ -30,6 +31,8 @@ typedef struct epoll_event Event;
 #define EVENT_ADD EPOLL_CTL_ADD
 #define EVENT_MOD EPOLL_CTL_MOD
 #define EVENT_DEL EPOLL_CTL_DEL
+#define IS_EVENT_READ(e) ((e).events & EPOLLIN)
+#define IS_EVENT_WRITE(e) ((e).events & EPOLLOUT)
 #elif __APPLE__
 typedef struct kevent Event;
 #define EVENT_READ EVFILT_READ
@@ -37,36 +40,53 @@ typedef struct kevent Event;
 #define EVENT_ADD EV_ADD
 #define EVENT_MOD EV_ADD
 #define EVENT_DEL EV_DELETE
+#define IS_EVENT_READ(e) ((e).filter == EVFILT_READ)
+#define IS_EVENT_WRITE(e) ((e).filter == EVFILT_WRITE)
 #endif
 
+
 enum ConnState {
-	READING_HEADERS = 64,
-	READING_BODY = 63,
-	PROCESSING = 62,
-	SENDING_RESPONSE = 61,
-	DRAINING_BODY = 60,
-	CLOSED = 59,
-	READING_CHUNKS = 58
+    READING_HEADER = 52,
+    READING_BODY = 51,
+	SENDING_FILE = 50,
+    PROCESSING = 45,
+    SENDING_RESPONSE = 44,
+    TIMEOUT = 43,
+    CLOSED = 42,
+	FINISHED = 41
 };
 
 struct Connection {
-    int         fd;
+    int         	fd;
+    int             port;
+	ConnState		state;
 
-    Buffer		recvBuffer;
-    Buffer		sendBuffer;
+    Buffer			buffer;
+	int				fileBuffer;
 
-    Request		req;
-    Response	res;
+    Request			req;
+    Response		res;
+    ServerConfig*   config;
+	LocationConfig	location;
 
-	int			fileFd;
-	bool		sendingFile;
-	
-	size_t		remainingBody;
-	int			state;
+	time_t			lastActivityTime;
 
-	time_t		lastActivityTime;
+	size_t			chunkSize;
+	bool			hasChunkSize;
+	std::string		tmpFilePath;
+    
+    Connection() : fd(-1), port(-1), state(READING_HEADER), fileBuffer(-1), config(NULL), lastActivityTime(std::time(NULL)), chunkSize(0), hasChunkSize(false) {}
 };
 
+struct CGIProcess {
+    pid_t		pid;
+    std::string	tmpFilePath;
+    Connection*	conn;
+	time_t		startTime;
+
+    CGIProcess(pid_t p, const std::string& path, Connection* c)
+        : pid(p), tmpFilePath(path), conn(c), startTime(std::time(NULL)) {}
+};
 
 struct DirEntry {
 	int			type;
@@ -75,60 +95,69 @@ struct DirEntry {
 	bool		is_dir;
 };
 
-class	Server {
+class	ServerManager {
 	private:
 		// config
-		ServerConfig	config_;
-		RequestParser	parser_;
+		Config                      fullConfig_;
+		std::map<int, std::vector<ServerConfig> > ports_;
 
 		// variables
 		std::map<int, Connection>	connections_;
-		int							serverFd_;
+		std::vector<CGIProcess>		cgiProcesses_;
+		std::map<int, int>          listeningSockets_;
 		int							epollFd_;
-		sockaddr_in					addr_;
 
-		void			initSocket();
-		void			acceptConnection();
+		void			initSockets();
+		void			acceptConnection(int serverFd);
+
 		void			handleClient(Event& event);
 		void			handleRead(Connection& conn);
 		void			handleWrite(Connection& conn);
-		void			modifyToWrite(int fd);
-		void			modifyToRead(int fd);
 		void			closeConnection(int fd);
-		int				runCGI(const char* cgiPath, Connection& conn);
-		void			sendCGIOutput(Connection& conn, int cgiFd);
-		void			handleRequest(Connection& conn);
-		int				resolvePath(std::string& path, LocationConfig& location);
-		LocationConfig&	resolveLocation(std::string& fs_path);
-		void			generateAutoindex(Connection& conn, LocationConfig& location);
-		void			sendRedirect(Connection& conn, const LocationConfig& location);
-		std::string		findCGI(const std::string& fileName, const StringMap& cgiMap);
+		void			generateAutoindex(Connection& conn);
+		void			sendRedirect(Connection& conn);
 		bool			prepareFileResponse(Connection& conn, const std::string& path);
 		bool			streamFileChunk(Connection& conn);
 		void			sendError(int code, Connection& conn);
-		char**			createEnvironment(const Request& req);
 		
-		void			finishBody(Connection& conn);
+		void			startBodyReading(Connection& conn);
 		void			processBody(Connection& conn);
-		void			startBodyReading(Connection& conn, size_t endPos);
-		void			handleSimpleRequest(Connection& conn, size_t endPos);
-		bool			validateRequest(Connection& conn);
+		void			processFixedBody(Connection& conn);
+		void			processChunkedBody(Connection& conn);
+
+		bool			handleMultipartUpload(Connection& conn, LocationConfig& location);
 		void			processHeaders(Connection& conn);
+
 		void			checkTimeOuts();
+		void			checkCGIProcesses();
+
+		void			handleGet(Connection& conn);
+		void			handlePost(Connection& conn);
+
+		void			runCGI(const char* cgiPath, Connection& conn);
+		void			handleCGIRead(Connection& conn, const std::string& tmpFilePath);
+		void			handleCGIWrite(Connection& conn);
+
+		void			modifyToWrite(int fd);
+		void			modifyToRead(int fd);
+		void			addEvent(int fd, bool wantRead, bool wantWrite);
+
+        ServerConfig*   findServerConfig(int port, const std::string& host);
 
 	public:
-		Server(const ServerConfig& config); // Start server with configurations from file
-		~Server();
+		ServerManager(const Config& config);
+		~ServerManager();
 
-		void		loop();
+		void			run();
 };
 
+int						resolvePath(std::string& path, LocationConfig& location);
 void					log(int type, const std::string& msg);
-
-bool					fileExists(const std::string& path);
-bool					canReadFile(const std::string& path);
+std::string				generateRandomName(const std::string& prefix);
+LocationConfig&			resolveLocation(std::string& fs_path, LocationList& locations);
 ssize_t					getFileSize(const std::string& path);
-std::string				readFile(const std::string& filename);
 std::vector<DirEntry>	listDirectory(const std::string& path);
 std::string				toString(size_t n);
+std::string				findCGI(const std::string& fileName, const StringMap& cgiMap);
+int						openTempFile(std::string& path);
 #endif

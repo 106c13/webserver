@@ -4,7 +4,7 @@
 #include "webserv.h"
 #include "defines.h"
 
-int Server::resolvePath(std::string& path, LocationConfig& location) {
+int resolvePath(std::string& path, LocationConfig& location) {
     struct stat st;
     std::string tmp;
 
@@ -34,9 +34,8 @@ int Server::resolvePath(std::string& path, LocationConfig& location) {
                 return FORBIDDEN;
             }
 
-            if (!S_ISREG(st.st_mode)) {
+            if (!S_ISREG(st.st_mode))
                 continue;
-            }
 
             path = tmp;
             return OK;
@@ -44,23 +43,25 @@ int Server::resolvePath(std::string& path, LocationConfig& location) {
         return DIRECTORY_NO_INDEX;
     }
 
-    if (!S_ISREG(st.st_mode)) {
+    if (!S_ISREG(st.st_mode))
         return NOT_FOUND;
-    }
     
-    if (access(path.c_str(), R_OK | W_OK) != 0) {
+    if (access(path.c_str(), R_OK | W_OK) != 0)
         return FORBIDDEN;
-    }
 
     return OK;
 }
 
-LocationConfig& Server::resolveLocation(std::string& fs_path) {
+LocationConfig& resolveLocation(std::string& fs_path, LocationList& locations) {
     LocationConfig* best = NULL;
     size_t best_len = 0;
 
-    for (LocationList::iterator it = config_.locations.begin();
-         it != config_.locations.end();
+
+    if (fs_path.size() > 1 && fs_path[fs_path.size() - 1] == '/')
+        fs_path.erase(fs_path.length() - 1);
+
+    for (LocationList::iterator it = locations.begin();
+         it != locations.end();
          ++it) {
 
         const std::string& loc_path = it->path;
@@ -74,13 +75,17 @@ LocationConfig& Server::resolveLocation(std::string& fs_path) {
     }
 
     if (!best) {
-		if (config_.locations.empty()) {
+		if (locations.empty())
 			throw std::runtime_error("No locations configured");
-        }
-		best = &config_.locations.front();
+
+		best = &locations.front();
 	}
 
-    fs_path = best->root + "/" + fs_path.substr(best_len);
+    fs_path = fs_path.substr(best_len);
+    if (fs_path.size() > 0 && fs_path[0] == '/')
+        fs_path = best->root + fs_path;
+    else
+        fs_path = best->root + "/" + fs_path;
 
     return *best;
 }

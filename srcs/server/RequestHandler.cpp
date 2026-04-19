@@ -1,87 +1,157 @@
-#include <fcntl.h>
 #include <cstdio>
+#include <fcntl.h>
 #include "webserv.h"
 #include "ConfigParser.h"
 
-int deleteResource(const std::string& path) {
-    if (access(path.c_str(), W_OK) != 0)
-        return FORBIDDEN;
+static std::string extractFilename(const std::string& headers) {
+    size_t fpos = headers.find("filename=\"");
+    if (fpos == std::string::npos)
+        return "";
 
-    if (remove(path.c_str()) != 0)
-        return SERVER_ERROR;
+    fpos += 10;
+    size_t fend = headers.find("\"", fpos);
+    if (fend == std::string::npos)
+        return "";
 
-    return NO_CONTENT;
+    std::string name = headers.substr(fpos, fend - fpos);
+
+    size_t slash = name.find_last_of("/\\");
+    if (slash != std::string::npos)
+        name = name.substr(slash + 1);
+
+    return name;
 }
 
-
-void Server::handleRequest(Connection& conn) {
+static bool handleMultipart(Connection& conn) {
     Request& req = conn.req;
-    Response& res = conn.res;
-    
-    LocationConfig location = resolveLocation(req.path);
-    resolvePath(req.path, location);
+    LocationConfig& location = conn.location;
 
-    res.path = req.path;
-	
-	if (req.method == "DELETE") {
-		return sendError(deleteResource(req.path), conn);
-	}
+    std::string boundary = "--" + req.boundary;
 
-	std::string cgiPath = findCGI(req.path, location.cgi);
+    int fd = open(req.tempFilePath.c_str(), O_RDONLY);
+    if (fd < 0)
+        return false;
 
-	if (!cgiPath.empty()) {
-		int fd = runCGI(cgiPath.c_str(), conn);
-		if (fd < 0) {
-			return sendError(SERVER_ERROR, conn);
-        }
-        return sendCGIOutput(conn, fd);
-	}
-	
-	if (req.method == "POST") {
-        std::string contentType = req.headers["Content-Type"];
+    char buf[BUFFER_SIZE];
+    std::string buffer;
+    ssize_t n;
 
-        if (contentType.find("multipart/form-data") != std::string::npos) {
-            StringMap formFields;
+    int out_fd = -1;
+    bool in_file = false;
 
-            for (std::vector<MultipartPart>::iterator it = req.multipartParts.begin();
-                 it != req.multipartParts.end();
-                 ++it)
-            {
-                if (!it->filename.empty()) {
-                    std::string uploadDir = location.uploadDir;
-                    std::string safeName = it->filename;
+    while ((n = read(fd, buf, BUFFER_SIZE)) > 0) {
+        buffer.append(buf, n);
 
-                    size_t slash = safeName.find_last_of("/\\");
-                    if (slash != std::string::npos)
-                        safeName = safeName.substr(slash + 1);
+        size_t pos;
 
-                    std::string fullPath = uploadDir + "/" + safeName;
+        while ((pos = buffer.find(boundary)) != std::string::npos) {
 
-                    int fd = open(fullPath.c_str(),
-                                  O_WRONLY | O_CREAT | O_TRUNC,
-                                  0644);
+            if (in_file && out_fd != -1 && pos > 0) {
+				if (buffer[pos - 1] == '\n' && buffer[pos - 2] == '\r')
+					pos -= 2;
+				if (pos > 0)
+                	write(out_fd, buffer.data(), pos);
+            }
 
-                    if (fd < 0)
-                        return sendError(SERVER_ERROR, conn);
+            buffer.erase(0, pos + boundary.size());
 
-                    ssize_t written = write(fd,
-                                            it->data.data(),
-                                            it->data.size());
+            if (buffer.compare(0, 2, "--") == 0)
+                break;
 
+            if (buffer.compare(0, 2, "\r\n") == 0)
+                buffer.erase(0, 2);
+
+            if (out_fd != -1) {
+                close(out_fd);
+                out_fd = -1;
+            }
+
+            size_t header_end;
+            while ((header_end = buffer.find("\r\n\r\n")) == std::string::npos) {
+                n = read(fd, buf, BUFFER_SIZE);
+                if (n <= 0) break;
+                buffer.append(buf, n);
+            }
+
+            if (header_end == std::string::npos)
+                break;
+
+            std::string headers = buffer.substr(0, header_end);
+            buffer.erase(0, header_end + 4);
+
+            std::string filename = extractFilename(headers);
+
+            if (!filename.empty()) {
+                std::string fullPath = location.uploadDir + "/" + filename;
+
+                out_fd = open(fullPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                if (out_fd < 0) {
                     close(fd);
-
-                    if (written < 0)
-                        return sendError(SERVER_ERROR, conn);
-                } else {
-                    formFields[it->name] = it->data;
+                    return false;
                 }
+                in_file = true;
+            } else {
+                in_file = false;
+            }
+        }
+
+        if (in_file && out_fd != -1) {
+            if (buffer.size() > boundary.size()) {
+                size_t safe = buffer.size() - boundary.size();
+                write(out_fd, buffer.data(), safe);
+                buffer.erase(0, safe);
             }
         }
     }
-	conn.res.status = OK;
+
+    if (out_fd != -1)
+        close(out_fd);
+
+    close(fd);
+    return true;
+}
+
+
+void ServerManager::handlePost(Connection& conn) {
+    Request& req = conn.req;
+    Response& res = conn.res;
+    LocationConfig& location = conn.location;
+
+    res.path = req.path;
+    conn.state = PROCESSING;
+
+    if (location.root.empty())
+        return sendError(OK, conn);
+
+    if (!req.cgiPath.empty())
+        return runCGI(req.cgiPath.c_str(), conn);
+
+    handleMultipart(conn);
+
     if (!prepareFileResponse(conn, req.path))
         return sendError(SERVER_ERROR, conn);
 
     streamFileChunk(conn);
-	modifyToWrite(conn.fd);
+    modifyToWrite(conn.fd);
+}
+
+void ServerManager::handleGet(Connection& conn) {
+    Request& req = conn.req;
+    Response& res = conn.res;
+    LocationConfig& location = conn.location;
+
+	conn.state = PROCESSING;
+    if (location.root.empty())
+        return sendError(OK, conn);
+
+    res.path = req.path;
+
+    if (!req.cgiPath.empty())
+		return runCGI(req.cgiPath.c_str(), conn);
+
+    if (!prepareFileResponse(conn, req.path))
+        return sendError(SERVER_ERROR, conn);
+
+    streamFileChunk(conn);
+    modifyToWrite(conn.fd);
 }

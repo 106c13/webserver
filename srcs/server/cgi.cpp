@@ -1,168 +1,120 @@
 #include <string.h>
 #include <sstream>
 #include <unistd.h>
+#include <fcntl.h> 
+#include <errno.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
 #include "defines.h"
 #include "webserv.h"
 
-char** Server::createEnvironment(const Request& req) {
-    char** env = new char*[11];
+static char** createEnvironment(const Request& req, int port) {
+    char** env = new char*[64]; 
     int i = 0;
 
     std::string method = "REQUEST_METHOD=" + req.method;
     env[i++] = strdup(method.c_str());
 
-	std::string redirectStatus = "REDIRECT_STATUS=200";
-	env[i++] = strdup(redirectStatus.c_str());
+    env[i++] = strdup("REDIRECT_STATUS=200");
 
     std::string script = "SCRIPT_FILENAME=" + req.path;
     env[i++] = strdup(script.c_str());
 
+    std::string pathInfo = "PATH_INFO=" + req.path;
+    env[i++] = strdup(pathInfo.c_str());
+
     std::string query = "QUERY_STRING=" + req.queryString;
     env[i++] = strdup(query.c_str());
 
-    std::string protocol = "SERVER_PROTOCOL=HTTP/1.1";
-    env[i++] = strdup(protocol.c_str());
+    env[i++] = strdup("SERVER_PROTOCOL=HTTP/1.1");
+    env[i++] = strdup("GATEWAY_INTERFACE=CGI/1.1");
+    env[i++] = strdup("SERVER_NAME=127.0.0.1");
 
-    std::string gateway = "GATEWAY_INTERFACE=CGI/1.1";
-    env[i++] = strdup(gateway.c_str());
-
-    std::string serverName = "SERVER_NAME=127.0.0.1";
-    env[i++] = strdup(serverName.c_str());
-
-    std::string serverPort = "SERVER_PORT=" + toString(config_.port);
+    std::string serverPort = "SERVER_PORT=" + toString(port);
     env[i++] = strdup(serverPort.c_str());
 
     if (req.method == "POST") {
-        std::string contentLength =
-            "CONTENT_LENGTH=" + req.headers.at("Content-Length");
+        std::string contentLength = "CONTENT_LENGTH=" + toString(req.bodySize);
         env[i++] = strdup(contentLength.c_str());
 
-        std::string contentType =
-            "CONTENT_TYPE=" + req.headers.at("Content-Type");
-        env[i++] = strdup(contentType.c_str());
+        std::map<std::string,std::string>::const_iterator itType = req.headers.find("Content-Type");
+        if (itType != req.headers.end()) {
+            std::string contentType = "CONTENT_TYPE=" + itType->second;
+            env[i++] = strdup(contentType.c_str());
+        }
+    }
+
+    for (std::map<std::string,std::string>::const_iterator it = req.headers.begin();
+         it != req.headers.end(); ++it)
+    {
+        std::string name = it->first;
+
+        std::string lname;
+        for (size_t k = 0; k < name.size(); ++k)
+            lname += tolower(name[k]);
+
+        if (lname == "content-type" ||
+            lname == "content-length" ||
+            lname == "transfer-encoding" ||
+            lname == "connection" ||
+            lname == "host")
+            continue;
+
+        std::string envVar = "HTTP_";
+        for (size_t k = 0; k < name.size(); ++k) {
+            char c = name[k];
+            envVar += (c == '-') ? '_' : toupper(c);
+        }
+        envVar += "=" + it->second;
+
+        env[i++] = strdup(envVar.c_str());
     }
 
     env[i] = NULL;
-
     return env;
 }
 
-void Server::sendCGIOutput(Connection& conn, int cgiFd) {
-    std::string cgiOut;
-    char buf[BUFFER_SIZE];
-    ssize_t n;
-
-    while ((n = read(cgiFd, buf, sizeof(buf))) > 0)
-        cgiOut.append(buf, n);
-
-    close(cgiFd);
-
-    Response& res = conn.res;
-
-    size_t pos = cgiOut.find("\r\n\r\n");
-    std::string cgiHeaders;
-    std::string body;
-
-    if (pos != std::string::npos) {
-        cgiHeaders = cgiOut.substr(0, pos);
-        body = cgiOut.substr(pos + 4);
-    } else {
-        body = cgiOut;
-    }
-
-    res.contentType = "text/html";
-    res.status = OK;
-
-    std::istringstream stream(cgiHeaders);
-    std::string line;
-
-    while (std::getline(stream, line)) {
-        if (!line.empty() && line[line.size() - 1] == '\r')
-            line.erase(line.size() - 1);
-
-        if (line.find("Status:") == 0) {
-            res.status = atoi(line.substr(7).c_str());
-        } else if (line.find("Location:") == 0) {
-            res.location = line.substr(10);
-        }
-    }
-
-    res.contentLength = toString(body.size());
-
-    std::string header = generateHeader(res);
-
-    conn.sendBuffer.append(header);
-    conn.sendBuffer.append(body);
-
-    modifyToWrite(conn.fd);
-}
-
-int Server::runCGI(const char* cgiPath, Connection& conn) {
-    int stdinPipe[2];
-    int stdoutPipe[2];
-
-    if (pipe(stdinPipe) < 0 || pipe(stdoutPipe) < 0) {
-        log(ERROR, "PIPE ERROR");
-        return -1;
-    }
+void ServerManager::runCGI(const char* cgiPath, Connection& conn) {
+    std::string tmpl;
+    int tmpFd = openTempFile(tmpl);
+    if (tmpFd == -1)
+        return log(ERROR, "Failed to create tmp file");
+    close(tmpFd);
 
     pid_t pid = fork();
-    if (pid < 0) {
-        log(ERROR, "FORK ERROR");
-        return -1;
-    }
+    if (pid < 0)
+        return log(ERROR, "Fork failed");
 
     if (pid == 0) {
-        dup2(stdinPipe[0], STDIN_FILENO);
-        dup2(stdoutPipe[1], STDOUT_FILENO);
-        dup2(stdoutPipe[1], STDERR_FILENO);
+        int outFd = open(tmpl.c_str(), O_WRONLY | O_TRUNC);
+        if (outFd == -1)
+            _exit(1);
 
-        close(stdinPipe[1]);
-        close(stdoutPipe[0]);
-        close(stdinPipe[0]);
-        close(stdoutPipe[1]);
+        dup2(outFd, STDOUT_FILENO);
+        dup2(outFd, STDERR_FILENO);
+        close(outFd);
 
-        char** env = createEnvironment(conn.req);
+        if (conn.req.method == "POST") {
+            int fd = open(conn.req.tempFilePath.c_str(), O_RDONLY);
+            if (fd == -1)
+                _exit(1);
 
-        char* argv[] = {
-            const_cast<char*>(cgiPath),
-            const_cast<char*>(conn.req.path.c_str()),
-            NULL
-        };
+            dup2(fd, STDIN_FILENO);
+            close(fd);
+        }
 
+        char* argv[] = { const_cast<char*>(cgiPath),
+                         const_cast<char*>(conn.req.path.c_str()),
+                         NULL};
+        char** env = createEnvironment(conn.req, conn.config->port);
         execve(cgiPath, argv, env);
         _exit(1);
     }
-
-
-    close(stdinPipe[0]);
-    close(stdoutPipe[1]);
-
-    if (conn.req.method == "POST") {
-        const std::string& body = conn.req.body;
-        size_t size = body.size();
-        size_t total = 0;
-
-        while (total < size) {
-            ssize_t n = write(stdinPipe[1],
-                              body.data() + total,
-                              size - total);
-
-            if (n <= 0) {
-                log(ERROR, "WRITE TO CGI STDIN FAILED");
-                break;
-            }
-
-            total += n;
-        }
-    }
-
-    close(stdinPipe[1]);
-
-    return stdoutPipe[0];
+    cgiProcesses_.push_back(CGIProcess(pid, tmpl, &conn));
+	conn.tmpFilePath = tmpl;
 }
 
-std::string Server::findCGI(const std::string& fileName, const StringMap& cgiMap) {
+std::string findCGI(const std::string& fileName, const StringMap& cgiMap) {
 	std::string extension;
 
 	for (int i = fileName.size() - 1; i >= 0; i--) {
@@ -177,9 +129,86 @@ std::string Server::findCGI(const std::string& fileName, const StringMap& cgiMap
 
 	std::map<std::string, std::string>::const_iterator it = cgiMap.find(extension);
 
-	if (it == cgiMap.end()) {
+	if (it == cgiMap.end())
 		return "";
-    }
 
 	return it->second;
+}
+
+static void parseCGIHeaders(Response& res, const std::string& headers) {
+    res.status = OK;
+    res.contentType = "text/html";
+
+    std::istringstream stream(headers);
+    std::string line;
+
+    while (std::getline(stream, line)) {
+        if (!line.empty() && line[line.size() - 1] == '\r')
+            line.resize(line.size() - 1);
+
+        if (line.find("Status:") == 0)
+            res.status = atoi(line.substr(7).c_str());
+        else if (line.find("Content-Type:") == 0)
+            res.contentType = line.substr(13);
+        else if (line.find("Location:") == 0)
+            res.location = line.substr(10);
+    }
+}
+
+void ServerManager::handleCGIRead(Connection& conn, const std::string& tmpFilePath) {
+    std::string raw;
+    std::string headers;
+    char buf[BUFFER_SIZE];
+
+    int fd = open(tmpFilePath.c_str(), O_RDONLY);
+    if (fd < 0) {
+        log(ERROR, "Can't open file");
+        return sendError(SERVER_ERROR, conn);
+    }
+
+    ssize_t totalSize = getFileSize(tmpFilePath);
+    if (totalSize < 0) {
+        log(ERROR, "Can't get file size");
+        close(fd);
+        return sendError(SERVER_ERROR, conn);
+    }
+
+    size_t pos = std::string::npos;
+
+    while (true) {
+        ssize_t n = read(fd, buf, BUFFER_SIZE);
+        if (n > 0) {
+            raw.append(buf, n);
+
+            pos = raw.find("\r\n\r\n");
+            if (pos != std::string::npos)
+                break;
+        } else if (n == 0) {
+            break;
+        } else {
+            close(fd);
+            return sendError(SERVER_ERROR, conn);
+        }
+    }
+    conn.buffer.clear();
+
+    if (pos == std::string::npos)
+		return sendError(SERVER_ERROR, conn);
+
+    headers = raw.substr(0, pos);
+    parseCGIHeaders(conn.res, headers);
+
+    size_t bodyStart = pos + 4;
+    std::string remainder = raw.substr(bodyStart);
+
+    conn.res.contentLength = toString(totalSize - bodyStart);
+
+    std::string responseHeader = generateHeader(conn.res, toString(conn.port));
+    conn.buffer.append(responseHeader);
+    conn.buffer.append(remainder);
+
+    conn.fileBuffer = fd;
+    conn.state = SENDING_FILE;
+
+    modifyToWrite(conn.fd);
 }

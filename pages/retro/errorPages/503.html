@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>500 Internal Server Error</title>
+<style>
+/* ====== GLOBAL ====== */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+:root {
+    --bg: #020617;
+    --panel: #020617;
+    --cyan: #22d3ee;
+    --cyan-soft: rgba(34, 211, 238, 0.2);
+    --text: #e0faff;
+    --muted: #67e8f9;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at top, #022c3a, var(--bg));
+    color: var(--text);
+    font-family: "Press Start 2P", monospace;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ====== CRT EFFECT ====== */
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background:
+        repeating-linear-gradient(
+            to bottom,
+            rgba(255,255,255,0.02),
+            rgba(255,255,255,0.02) 1px,
+            transparent 1px,
+            transparent 3px
+        );
+    pointer-events: none;
+}
+
+/* ====== PANEL ====== */
+.panel {
+    background: linear-gradient(180deg, #020617, #000);
+    border: 2px solid var(--cyan);
+    box-shadow:
+        0 0 30px var(--cyan-soft),
+        inset 0 0 20px rgba(0,0,0,0.8);
+    padding: 2.5rem;
+    max-width: 720px;
+    width: 90%;
+}
+
+/* ====== HEADINGS ====== */
+h1 {
+    color: var(--cyan);
+    margin: 0 0 1rem;
+    text-shadow: 0 0 10px var(--cyan);
+}
+
+h2 {
+    color: var(--muted);
+    margin-top: 2rem;
+}
+
+/* ====== TEXT ====== */
+p {
+    font-size: 0.7rem;
+    line-height: 1.8;
+}
+
+/* ====== NAV ====== */
+.nav {
+    display: flex;
+    gap: 1rem;
+    margin: 1.5rem 0;
+    flex-wrap: wrap;
+}
+
+.nav a {
+    text-decoration: none;
+    color: var(--cyan);
+    padding: 0.6rem 1rem;
+    border: 1px solid var(--cyan);
+    box-shadow: inset 0 0 10px var(--cyan-soft);
+    transition: all 0.15s ease;
+}
+
+.nav a:hover {
+    background: var(--cyan);
+    color: #020617;
+}
+
+/* ====== ERROR CODE ====== */
+.code {
+    font-size: 4rem;
+    color: var(--cyan);
+    text-shadow: 0 0 20px var(--cyan);
+}
+
+/* ====== FOOTER ====== */
+.footer {
+    margin-top: 2rem;
+    font-size: 0.6rem;
+    color: var(--muted);
+    opacity: 0.8;
+}
+.terminal {
+    background: rgba(2, 6, 23, 0.9);
+    border: 1px solid rgba(34, 211, 238, 0.4);
+    border-radius: 8px;
+    padding: 1rem;
+    height: 220px;
+    overflow-y: auto;
+
+    /* SAME FONT AS MAIN PAGE */
+    font-family: -apple-system, BlinkMacSystemFont,
+                 "Segoe UI", Roboto, Ubuntu,
+                 Cantarell, sans-serif;
+
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    text-align: left;
+
+    box-shadow: inset 0 0 20px rgba(34, 211, 238, 0.1);
+}
+
+.line {
+    color: #22d3ee;
+    text-shadow: 0 0 6px rgba(34, 211, 238, 0.6);
+    margin-bottom: 0.3rem;
+}
+</style>
+</head>
+<body>
+<main>
+<div class="panel">
+    <div class="code">503</div>
+    <p>SERVICE UNAVAILABLE</p>
+</div>
+</main>
+</body>
+</html>
+

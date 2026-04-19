@@ -1,21 +1,15 @@
 NAME = webserv
 
-# ---------- Temprorary -----------
-CGI_SRC = cgi/test.c
-CGI_BIN = php-cgi
-CC = cc
-CFLAGS = -Wall -Wextra -Werror
-# ---------------------------------
-
 SRCS_DIR = srcs/
 OBJS_DIR = obj/
 INCLUDES = include/
 
 SRC_MAIN   = main.cpp
-SRC_SERVER = server.cpp utils.cpp \
+SRC_SERVER = ServerManager.cpp utils.cpp \
              defaults.cpp path_resolver.cpp \
-			 autoindex.cpp cgi.cpp header_generator.cpp \
-			 ClientHandler.cpp RequestHandler.cpp ResponseBuilder.cpp
+			 autoindex.cpp cgi.cpp header_generator.cpp Connection.cpp \
+			 ClientHandler.cpp RequestHandler.cpp ResponseBuilder.cpp \
+			 BodyHandler.cpp epoll.cpp
 SRC_PARSER = ConfigParser.cpp RequestParser.cpp
 SRC_BUFFER = buffer.cpp
 
@@ -29,7 +23,7 @@ SRC = \
 OBJ = $(patsubst $(SRCS_DIR)%.cpp, $(OBJS_DIR)%.o, $(SRC))
 
 CXX = c++
-CXXFLAGS =  -std=c++98 -I $(INCLUDES)
+CXXFLAGS =  -std=c++98 -Wall -Wextra -Werror -I $(INCLUDES) -fsanitize=address -fsanitize=undefined -g
 
 
 GREEN = \033[1;32m
@@ -41,13 +35,6 @@ RESET = \033[0m
 
 all: $(NAME) $(CGI_BIN)
 
-# ---------- Temprorary -----------
-$(CGI_BIN): $(CGI_SRC)
-	@echo "$(CYAN)[Compiling CGI]$(RESET) $<"
-	@$(CC) $(CFLAGS) $< -o $(CGI_BIN)
-	@echo "$(GREEN)✅ CGI ready: ./$(CGI_BIN)$(RESET)"
-# ---------------------------------
-#
 $(NAME): $(OBJ)
 	@echo "$(YELLOW)🔧 Linking $(NAME)...$(RESET)"
 	@$(CXX) $(CXXFLAGS) $(OBJ) -o $(NAME)
@@ -67,10 +54,17 @@ $(OBJS_DIR)%.o: $(SRCS_DIR)%.cpp
 	@echo "$(CYAN)[Compiling]$(RESET) $<"
 	@$(CXX) $(CXXFLAGS) -c $< -o $@
 
+WEBSERV_TARGET ?= 127.0.0.1:8080
+
 test:
 	@$(CXX) $(CXXFLAGS) tests/test_config_parser.cpp $(SRCS_DIR)parser/ConfigParser.cpp -o test_config_parser
-	@$(CXX) $(CXXFLAGS) tests/test_request_parser.cpp $(SRCS_DIR)parser/RequestParser.cpp $(SRCS_DIR)server/header_generator.cpp -o test_request_parser
-	@./test_config_parser ; c=$$? ; echo "" ; ./test_request_parser ; r=$$? ; rm -f test_config_parser test_request_parser ; exit $$((c + r))
+	@$(CXX) $(CXXFLAGS) tests/test_request_parser.cpp $(SRCS_DIR)parser/RequestParser.cpp $(SRCS_DIR)server/header_generator.cpp $(SRCS_DIR)server/utils.cpp -o test_request_parser
+	@$(CXX) $(CXXFLAGS) testweb.cpp -o testweb
+	@./test_config_parser ; c=$$? ; echo "" ; \
+	 ./test_request_parser ; r=$$? ; echo "" ; \
+	 ./testweb $(WEBSERV_TARGET) ; w=$$? ; \
+	 rm -f test_config_parser test_request_parser testweb ; \
+	 exit $$((c + r + w))
 
 clean:
 	@rm -rf $(OBJS_DIR)

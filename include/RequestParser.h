@@ -5,6 +5,17 @@
 #include <map>
 #include <vector>
 
+enum BodySource {
+    BODY_FROM_MEMORY,
+    BODY_FROM_FILE,
+    BODY_DONE
+};
+
+enum DataTransfer {
+    FIXED,
+    CHUNKED
+};
+
 struct Cookie {
 	std::string	name;
 	std::string	value;
@@ -42,11 +53,19 @@ struct Request {
 	std::string							version;
 	std::map<std::string, std::string>	headers;
 	std::map<std::string, std::string>	queryParams;
+	std::string							header;
 	std::string							body;
+	int									fileBuffer;
+	std::string							tempFilePath;
+	size_t								bodySize;
+	size_t								bodyReceived;
+	size_t								bodySent;
+	DataTransfer						transferType;
 	std::vector<Cookie>					cookies;
 	std::vector<SetCookie>				setCookies;
 	std::vector<MultipartPart>			multipartParts;
 	std::string							boundary;
+	std::string							cgiPath;
 	Request();
 };
 

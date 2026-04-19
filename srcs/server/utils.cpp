@@ -2,6 +2,7 @@
 #include <sys/stat.h>
 #include <iostream>
 #include <ctime>
+#include <cstdlib>
 #include "webserv.h"
 
 std::string getTime() {
@@ -13,46 +14,57 @@ std::string getTime() {
     return std::string(buffer);
 }
 
+std::string generateRandomName(const std::string& prefix) {
+    static const char charset[] =
+        "0123456789"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz";
+    std::string name = prefix;
+    
+    for (int i = 0; i < 10; ++i) {
+        name += charset[rand() % (sizeof(charset) - 1)];
+    }
+    return name;
+}
+
 void log(int type, const std::string& msg) {
 
     std::string time = getTime();
 
     if (type == INFO) {
-        std::cout << COLOR_GREEN
-                  << "[" << time << "] "
+        std::cout << "[" << time << "] "
+                  << COLOR_BLUE
                   << "[INFO] "
                   << msg
                   << COLOR_RESET
-                  << std::endl;
+                  << "\n";
 
     } else if (type == ERROR) {
-        std::cerr << COLOR_RED
-                  << "[" << time << "] "
+        std::cerr << "[" << time << "] "
+                  << COLOR_RED
                   << "[ERROR] "
                   << msg
                   << COLOR_RESET
-                  << std::endl;
+                  << "\n";
 
     } else if (type == WARNING) {
-        std::cerr << COLOR_YELLOW
-                  << "[" << time << "] "
+        std::cout << "[" << time << "] "
+                  << COLOR_YELLOW
                   << "[WARNING] "
                   << msg
                   << COLOR_RESET
-                  << std::endl;
-    }
+                  << "\n";
+    } else if (type == DEBUG) {
+        std::cout << "[" << time << "] "
+                  << COLOR_GREEN
+                  << "[DEBUG] "
+                  << msg
+                  << COLOR_RESET
+                  << "\n";
+	}
 }
 
-bool fileExists(const std::string& path) {
-    return (access(path.c_str(), F_OK) == 0);
-}
-
-bool canReadFile(const std::string& path) {
-	return (access(path.c_str(), R_OK) == 0);
-}
-
-ssize_t getFileSize(const std::string& path)
-{
+ssize_t getFileSize(const std::string& path) {
 	struct stat st;
 
 	if (stat(path.c_str(), &st) < 0) {
@@ -62,28 +74,7 @@ ssize_t getFileSize(const std::string& path)
 	return st.st_size;
 }
 
-std::string readFile(const std::string& filename) {
-	int         fd;
-	char        buffer[1024];
-	ssize_t     bytes;
-	std::string content;
-
-	fd = open(filename.c_str(), O_RDONLY);
-
-	if (fd < 0) {
-		return "";
-	}
-
-	while ((bytes = read(fd, buffer, sizeof(buffer))) > 0) {
-		content.append(buffer, bytes);
-	}
-
-	close(fd);
-	return content;
-}
-
-static int detectType(const std::string& name, bool is_dir)
-{
+static int detectType(const std::string& name, bool is_dir) {
     if (is_dir) {
         return 1;
 	}

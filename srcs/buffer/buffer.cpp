@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <iostream>
 #include <cstring>
 #include "Buffer.h"
 
@@ -51,11 +52,27 @@ const char* Buffer::data() const {
 }
 
 void Buffer::append(const char* buf, size_t len) {
-    if (cap_ - end_ < len) {
-        size_t new_cap = cap_ + len + 1024;
+    if (!buf || len == 0)
+        return;
+
+    size_t cur_size = end_ - start_;
+    size_t free_space = cap_ - cur_size;
+
+    if (start_ > 0) {
+        memmove(data_, data_ + start_, cur_size);
+        start_ = 0;
+        end_ = cur_size;
+    }
+
+    free_space = cap_ - end_;
+
+    if (free_space < len) {
+        size_t new_cap = cap_;
+        while (new_cap - cur_size < len)
+            new_cap += 1024;
+
         char* tmp = new char[new_cap];
 
-        size_t cur_size = end_ - start_;
         memcpy(tmp, data_ + start_, cur_size);
 
         delete[] data_;
@@ -95,4 +112,17 @@ void Buffer::consume(size_t n) {
 void Buffer::clear() {
     start_ = 0;
     end_ = 0;
+}
+
+bool Buffer::findCRLF(size_t& pos) const {
+    const char* d = data_;
+    size_t len = end_ - start_;
+
+    for (size_t i = 0; i + 1 < len; ++i) {
+        if (d[start_ + i] == '\r' && d[start_ + i + 1] == '\n') {
+            pos = i;
+            return true;
+        }
+    }
+    return false;
 }

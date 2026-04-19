@@ -3,6 +3,8 @@
 #include <cctype>
 #include <stdexcept>
 #include <iostream>
+#include <sys/stat.h>
+#include <cstdlib>
 
 /* Location Config */
 LocationConfig::LocationConfig() :
@@ -90,8 +92,22 @@ void ConfigParser::tokenize(const std::string& filename) {
 
 	_tokens.clear();
 	if (!file.is_open()) {
-		throw std::runtime_error("Cannot open config file");
+		throw std::runtime_error("Cannot open config file: " + filename);
 	}
+
+	struct stat st;
+	if (stat(filename.c_str(), &st) != 0) {
+		throw std::runtime_error("Cannot stat config file: " + filename);
+	}
+
+	if (!S_ISREG(st.st_mode)) {
+		throw std::runtime_error("Config file is not a regular file: " + filename);
+	}
+
+	if (st.st_size == 0) {
+    	throw std::runtime_error("Config file is empty: " + filename);
+	}
+
 	while (std::getline(file, line)) {
 		content += line;
 		content += '\n';
@@ -183,6 +199,35 @@ void ConfigParser::parseServer() {
 			server.clientMaxBodySize = parseSize(current().value);
 			expect(TOK_WORD, "Expected client max body size");
 			expect(TOK_SEMICOLON, "Expected ';' after client_max_body_size");
+		} else if (token_value == "cgi") {
+			next();
+			expect(TOK_LBRACE, "Expected '{' after cgi");
+
+			while (current().type != TOK_RBRACE) {
+				std::string key = current().value;
+
+				if (key == "method") {
+					next();
+					while (current().type == TOK_WORD) {
+						server.cgi.methods.push_back(current().value);
+						next();
+					}
+					expect(TOK_SEMICOLON, "Expected ';' after method");
+				} else {
+					std::string extension = current().value;
+					expect(TOK_WORD, "Expected CGI extension");
+
+					std::string handler = current().value;
+					expect(TOK_WORD, "Expected CGI handler path");
+
+					std::cout << "PARSER: " << handler << std::endl;
+					server.cgi.extensions[extension] = handler;
+
+					expect(TOK_SEMICOLON, "Expected ';' after cgi entry");
+				}
+			}
+
+			expect(TOK_RBRACE, "Expected '}' after cgi block");
 		} else if (token_value == "location") {
 			parseLocation(server);
 		} else {
@@ -253,6 +298,7 @@ void ConfigParser::parseLocation(ServerConfig& server) {
 		} else if (directive == "clientMaxBodySize") {
 			next();
 			location.clientMaxBodySize = parseSize(current().value);
+			location.hasClientMaxBodySize = true;
 			expect(TOK_WORD, "Expected size value");
 			expect(TOK_SEMICOLON, "Expected ';' after clientMaxBodySize");
 		} else if (directive == "hasClientMaxBodySize") {
@@ -355,6 +401,12 @@ void ConfigParser::print() const {
 		std::cout << "  Error Pages:" << std::endl;
 		for (std::map<int, std::string>::const_iterator it = server.errorPages.begin();
 			 it != server.errorPages.end(); ++it) {
+			std::cout << "    " << it->first << " -> " << it->second << std::endl;
+		}
+
+		std::cout << "  Server-level CGI:" << std::endl;
+		for (std::map<std::string, std::string>::const_iterator it = server.cgi.extensions.begin();
+			 it != server.cgi.extensions.end(); ++it) {
 			std::cout << "    " << it->first << " -> " << it->second << std::endl;
 		}
 
