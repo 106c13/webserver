@@ -195,10 +195,42 @@ void ServerManager::acceptConnection(int serverFd) {
 	}
 }
 
+static void checkConfig(ServerConfig& config) {
+    if (config.port < 0 || config.port > 65535)
+        throw std::runtime_error("Port should be 0-65535");
+
+    if (config.root.empty())
+        throw std::runtime_error("Server should have a root folder");
+
+    if (config.locations.empty()) {
+        LocationConfig loc;
+        loc.path = "/";
+        loc.root = config.root;
+        config.locations.push_back(loc);
+    }
+
+    for (size_t i = 0; i < config.locations.size(); ++i) {
+        LocationConfig& loc = config.locations[i];
+
+        if (!loc.hasClientMaxBodySize)
+            loc.clientMaxBodySize = config.clientMaxBodySize;
+
+        if (loc.path.empty())
+            throw std::runtime_error("Location must have a path");
+    }
+}
+
+
 void ServerManager::initSockets() {
 	for (std::map<int, std::vector<ServerConfig> >::iterator it = ports_.begin(); it != ports_.end(); ++it) {
 		int port = it->first;
 		int serverFd = socket(AF_INET, SOCK_STREAM, 0);
+
+		std::vector<ServerConfig>& servers = it->second;
+
+		for (size_t i = 0; i < servers.size(); ++i) {
+			checkConfig(servers[i]);
+		}
 
 		if (serverFd < 0)
 		    throw std::runtime_error("socket() failed");

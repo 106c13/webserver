@@ -23,7 +23,7 @@ SRC = \
 OBJ = $(patsubst $(SRCS_DIR)%.cpp, $(OBJS_DIR)%.o, $(SRC))
 
 CXX = c++
-CXXFLAGS =  -std=c++98 -Wall -Wextra -Werror -I $(INCLUDES) -fsanitize=address -fsanitize=undefined -g
+CXXFLAGS =  -std=c++98 -Wall -Wextra -Werror -I $(INCLUDES) #-fsanitize=address -fsanitize=undefined -g
 
 
 GREEN = \033[1;32m
