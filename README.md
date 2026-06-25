@@ -1,6 +1,6 @@
-# *This project has been created as part of the 42 curriculum by haaghaja, azolotar*
+# webserv
 
-## Screenshot
+> A shell webserver built at [42](https://42.fr) by [azolotar](https://github.com/sjapi) and [haaghaja](https://github.com/106c13)
 
 ![FdF Screenshot](assets/screenshot.png)
 
