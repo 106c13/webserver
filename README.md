@@ -1,5 +1,9 @@
 # *This project has been created as part of the 42 curriculum by haaghaja, azolotar*
 
+## Screenshot
+
+![FdF Screenshot](assets/screenshot.png)
+
 ## 📌 Description
 
 The **webserv** project consists of building a fully functional HTTP server in **C++ (C++98)**.
