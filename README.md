@@ -1,6 +1,6 @@
 # webserv
 
-> A shell webserver built at [42](https://42.fr) by [azolotar](https://github.com/sjapi) and [haaghaja](https://github.com/106c13)
+> A webserver built at [42](https://42.fr) by [azolotar](https://github.com/sjapi) and [haaghaja](https://github.com/106c13)
 
 ![FdF Screenshot](assets/screenshot.png)
 
